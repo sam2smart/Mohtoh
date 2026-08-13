@@ -115,6 +115,14 @@
 .alert-banner.error { background: var(--color-danger-100); color: var(--color-danger); }
 
 /* ---- Bottom sheet ---- */
+/* IMPORTANT: .sheet-scrim must be one z-index BELOW .sheet (--z-sheet - 1 = 999
+   vs --z-sheet = 1000). Both are position:fixed, so DOM order determines paint
+   order at equal z-index. #modeSwitchSheet lives inside partials/sidebar.php,
+   which is included BEFORE the page-level [data-sheet-scrim] div in every
+   dashboard. At equal z-index the later-DOM scrim painted OVER the earlier-DOM
+   sheet, making modeSwitchSheet invisible and unclickable when the scrim
+   activated. Keeping the scrim one level below ensures every .sheet always
+   wins regardless of where it or the scrim sits in the document. */
 .sheet-scrim {
   position: fixed;
   inset: 0;
@@ -122,7 +130,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition);
-  z-index: var(--z-sheet);
+  z-index: calc(var(--z-sheet) - 1);
 }
 .sheet-scrim.is-open { opacity: 1; pointer-events: auto; }
 

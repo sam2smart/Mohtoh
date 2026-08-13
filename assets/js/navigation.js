@@ -341,10 +341,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // [data-close-sheet] inside a .sheet closes its own nearest ancestor.
   // Screens with bespoke sheet logic (index.php, rider Home) keep their
   // existing handlers untouched — this is additive, not a replacement.
+  //
+  // Sidebar-originated triggers: the sidebar drawer (#sidebarDrawer) shares
+  // the same z-index tier (--z-sheet = 1000) as every bottom sheet. If the
+  // sidebar stays open while a sheet opens, the sidebar paints over the sheet
+  // at the same layer — the mode-switch sheet (and any other sheet opened from
+  // a sidebar link) appears covered/hidden. Close the sidebar first so the
+  // sheet is the only element visible at that tier.
   document.addEventListener('click', (e) => {
     const opener = e.target.closest('[data-open-sheet-id]');
     if (opener) {
       e.preventDefault();
+      // If the trigger is inside the sidebar, dismiss it before the sheet
+      // slides up — prevents the drawer from sitting in front of the sheet.
+      if (opener.closest('#sidebarDrawer')) {
+        closeSidebar();
+      }
       const target = document.getElementById(opener.dataset.openSheetId);
       if (target) openSheet(target, qs('[data-sheet-scrim]'));
       return;

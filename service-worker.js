@@ -3,7 +3,7 @@
 // Dynamically calculate BASE path to support local subdirectories (XAMPP) and production domain root
 const BASE = self.location.pathname.substring(0, self.location.pathname.lastIndexOf('/') + 1);
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `mohtoh-static-${CACHE_VERSION}`;
 const SHELL_CACHE = `mohtoh-shell-${CACHE_VERSION}`;
 const CURRENT_CACHES = [STATIC_CACHE, SHELL_CACHE];
