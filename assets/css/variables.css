@@ -1,0 +1,98 @@
+/* assets/css/variables.css
+   MohToh design tokens. Every color, radius, shadow, spacing and font
+   value used anywhere in the redesign should reference one of these —
+   never a repeated literal. */
+
+:root {
+  /* ---- Brand color ---- */
+  --color-primary: #0F8B8D;
+  --color-primary-600: #0c6f70;
+  --color-primary-700: #0a5a5b;
+  --color-primary-100: #e3f3f3;
+  --color-primary-50: #f2fafa;
+
+  --color-accent: #FFC107;
+  --color-accent-600: #e6ac00;
+  --color-accent-100: #fff6db;
+
+  /* ---- Neutrals / surfaces ---- */
+  --color-app-bg: #eef2f2;       /* behind the phone frame on desktop */
+  --color-surface: #F7F9F9;      /* app background inside the frame */
+  --color-card: #FFFFFF;
+  --color-text: #222222;
+  --color-text-soft: #64706f;
+  --color-text-faint: #9aa6a5;
+  --color-border: #e5eaea;
+  --color-overlay-scrim: rgba(10, 20, 20, 0.45);
+
+  /* ---- Semantic ---- */
+  --color-success: #1E9E5A;
+  --color-success-100: #e4f6ec;
+  --color-danger: #E5484D;
+  --color-danger-100: #fce9e9;
+  --color-warning: var(--color-accent);
+
+  /* ---- Radius ---- */
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  /* ---- Shadow ---- */
+  --shadow-card: 0 12px 30px rgba(0, 0, 0, .12);
+  --shadow-float: 0 8px 22px rgba(15, 139, 141, .28);
+  --shadow-soft: 0 4px 14px rgba(0, 0, 0, .06);
+
+  /* ---- Spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Typography ---- */
+  --font-display: 'Poppins', 'Inter', sans-serif;
+  --font-body: 'Inter', 'Poppins', sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 0.95rem;
+  --text-md: 1.05rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.6rem;
+  --text-2xl: 2rem;
+
+  /* ---- Motion ---- */
+  --transition: .3s ease;
+  --transition-fast: .18s ease;
+
+  /* ---- App shell ---- */
+  --app-max-width: 430px;
+  --header-height: 64px;
+  --bottom-nav-height: 76px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Shared bottom clearance so scrollable content never sits behind the
+     fixed bottom nav — single formula, used by every scroll container. */
+  --content-bottom-clearance: calc(var(--bottom-nav-height) + var(--safe-bottom) + var(--space-4));
+  /* .app-shell's own inset from the viewport at the desktop breakpoint
+     (see layout.css margin-block: 24px) — the fixed header/bottom-nav
+     read this same value so they line up with the shell's edges there. */
+  --shell-desktop-inset: 24px;
+
+  /* ---- Layer stack (z-index scale, single source of truth) ----
+     Mirrors the app's mobile-shell contract: map < overlay/card/header
+     < floating (FABs) < bottom nav < sheets < toast/modal overlay. */
+  --z-map: 100;
+  --z-overlay: 200;
+  --z-card: 300;
+  --z-header: 400;
+  --z-floating: 500; /* above scrollable content (.map-screen__scroll uses --z-card) so FABs are never covered */
+  --z-bottom-nav: 900;
+  --z-sheet: 1000;
+  --z-toast: 1050;
+  --z-modal-overlay: 1100;
+}

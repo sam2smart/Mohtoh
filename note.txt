@@ -1,0 +1,4 @@
+let do some validation, dont create user twise.
+let make the rider list work proper the way it suppose to work
+let make driver select riders that make request and apply to pick them up if it has not been implemented and let it be time count down.
+let driver put price according to kilometers they want and let riders select the best offers.

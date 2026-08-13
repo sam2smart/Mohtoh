@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mohtoh",
+      "runtimeExecutable": "C:/xampp/php/php.exe",
+      "runtimeArgs": ["-S", "localhost:8099", "-t", "."],
+      "port": 8099
+    },
+    {
+      "name": "mohtoh-verify",
+      "runtimeExecutable": "C:/xampp/php/php.exe",
+      "runtimeArgs": ["-S", "localhost:8124", "-t", "."],
+      "port": 8124
+    },
+    {
+      "name": "pwa-root-verify",
+      "runtimeExecutable": "C:/xampp/php/php.exe",
+      "runtimeArgs": ["-S", "localhost:8151", "-t", "."],
+      "port": 8151
+    },
+    {
+      "name": "pwa-subdir-verify",
+      "runtimeExecutable": "C:/xampp/php/php.exe",
+      "runtimeArgs": ["-S", "localhost:8152", "-t", "C:/xampp/htdocs/Mostmerit"],
+      "port": 8152
+    }
+  ]
+}

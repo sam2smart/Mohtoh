@@ -1,0 +1,270 @@
+ettings page for drivers and otherspages<?php
+// database/migrate.php
+require_once __DIR__ . '/../includes/db.php';
+
+try {
+    echo "Starting migrations...\n";
+
+    // 1. Alter users table to add 'admin' user_type
+    echo "Altering users table user_type...\n";
+    $pdo->exec("ALTER TABLE users MODIFY COLUMN user_type ENUM('rider', 'driver', 'admin') NOT NULL");
+
+    echo "Ensuring users.wallet_balance exists...\n";
+    $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'wallet_balance'");
+    if (!$check->fetch()) {
+        $pdo->exec("ALTER TABLE users ADD COLUMN wallet_balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00");
+    }
+
+    echo "Ensuring users.notification_settings exists...\n";
+    $notify_cols = [
+        'notify_on_rating' => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'notify_on_booking' => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'notify_ride_start' => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'notify_ride_cancel' => 'TINYINT(1) NOT NULL DEFAULT 1'
+    ];
+    foreach ($notify_cols as $col => $def) {
+        $check = $pdo->query("SHOW COLUMNS FROM users LIKE '$col'");
+        if (!$check->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN $col $def");
+        }
+    }
+
+    // 2. Drop foreign key constraint on driver_id in ride_requests (if exists) so we can modify it
+    echo "Altering ride_requests columns...\n";
+    try {
+        // Attempt to find and drop foreign key constraint for driver_id
+        $stmt = $pdo->query("
+            SELECT CONSTRAINT_NAME 
+            FROM information_schema.KEY_COLUMN_USAGE 
+            WHERE TABLE_SCHEMA = DATABASE() 
+              AND TABLE_NAME = 'ride_requests' 
+              AND COLUMN_NAME = 'driver_id' 
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
+        $fk = $stmt->fetch();
+        if ($fk) {
+            $constraint_name = $fk['CONSTRAINT_NAME'];
+            echo "Found foreign key constraint: $constraint_name. Dropping it...\n";
+            $pdo->exec("ALTER TABLE ride_requests DROP FOREIGN KEY $constraint_name");
+        }
+    } catch (Exception $e) {
+        echo "Note: Could not drop foreign key automatically (may not exist): " . $e->getMessage() . "\n";
+    }
+
+    // 3. Modify driver_id to be NULL, and add new columns
+    $pdo->exec("ALTER TABLE ride_requests MODIFY COLUMN driver_id INT NULL");
+    $pdo->exec("ALTER TABLE ride_requests MODIFY COLUMN status ENUM('pending', 'accepted', 'in_progress', 'rejected', 'completed', 'cancelled') NOT NULL DEFAULT 'pending'");
+    
+    // Re-add foreign key with ON DELETE SET NULL and allow NULL
+    try {
+        $pdo->exec("ALTER TABLE ride_requests ADD CONSTRAINT fk_ride_requests_driver FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE SET NULL");
+        echo "Foreign key constraint re-added.\n";
+    } catch (Exception $e) {
+        echo "Note: Could not re-add foreign key (might already exist): " . $e->getMessage() . "\n";
+    }
+
+    // Add new columns to ride_requests if they do not exist
+    $columns = [
+        'destination_lat' => "DECIMAL(10, 8) NULL AFTER destination",
+        'destination_lng' => "DECIMAL(11, 8) NULL AFTER destination_lat",
+        'requested_service_category' => "ENUM('Basic', 'Comfort', 'Standard', 'Premium') NOT NULL DEFAULT 'Standard' AFTER destination_lng",
+        'price' => "DECIMAL(10, 2) NULL AFTER destination_lng",
+        'platform_fee' => "DECIMAL(10, 2) NULL AFTER price"
+    ];
+
+    foreach ($columns as $col => $definition) {
+        $check = $pdo->query("SHOW COLUMNS FROM ride_requests LIKE '$col'");
+        if (!$check->fetch()) {
+            echo "Adding column '$col' to ride_requests...\n";
+            $pdo->exec("ALTER TABLE ride_requests ADD COLUMN $col $definition");
+        }
+    }
+
+    // 4. Create system_settings table
+    echo "Creating system_settings table...\n";
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS system_settings (
+            setting_key VARCHAR(50) PRIMARY KEY,
+            setting_value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    ");
+
+    // Insert default commission percentage (10%)
+    echo "Seeding system_settings...\n";
+    $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('commission_percentage', '10') ON DUPLICATE KEY UPDATE setting_value = '10'");
+    $stmt->execute();
+
+    // 5. Create ride_offers table
+    echo "Creating ride_offers table...\n";
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS ride_offers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            request_id INT NOT NULL,
+            driver_id INT NOT NULL,
+            price DECIMAL(10, 2) NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            status ENUM('pending', 'accepted', 'rejected', 'expired') DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (request_id) REFERENCES ride_requests(id) ON DELETE CASCADE,
+            FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
+    // 6. Create ride sharing tables
+    echo "Creating ride sharing tables...\n";
+    $pdo->exec(<<<SQL
+        CREATE TABLE IF NOT EXISTS ride_shares (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            driver_id INT NOT NULL,
+            pickup_location VARCHAR(255) NULL,
+            start_location VARCHAR(255) NULL,
+            destination VARCHAR(255) NOT NULL,
+            departure_date DATE NOT NULL,
+            departure_time TIME NOT NULL,
+            vehicle_id INT NULL,
+            vehicle_type VARCHAR(100) NOT NULL,
+            vehicle_info VARCHAR(255) NOT NULL,
+            total_seats INT NOT NULL DEFAULT 1,
+            available_seats INT NOT NULL DEFAULT 1,
+            pickup_lat DECIMAL(10, 8) NULL,
+            pickup_lng DECIMAL(11, 8) NULL,
+            destination_lat DECIMAL(10, 8) NULL,
+            destination_lng DECIMAL(11, 8) NULL,
+            price_per_passenger DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+            description TEXT DEFAULT NULL,
+            status ENUM('active', 'full', 'cancelled', 'completed') NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_rideshare_status_date (status, departure_date, departure_time)
+        )
+SQL);
+
+    $columnsToAdd = [
+        'pickup_location' => 'VARCHAR(255) NULL AFTER driver_id',
+        'start_location' => 'VARCHAR(255) NULL AFTER pickup_location',
+        'vehicle_id' => 'INT NULL AFTER departure_time',
+        'total_seats' => 'INT NOT NULL DEFAULT 1 AFTER vehicle_info',
+        'available_seats' => 'INT NOT NULL DEFAULT 1 AFTER total_seats',
+        'pickup_lat' => 'DECIMAL(10, 8) NULL AFTER available_seats',
+        'pickup_lng' => 'DECIMAL(11, 8) NULL AFTER pickup_lat',
+        'destination_lat' => 'DECIMAL(10, 8) NULL AFTER pickup_lng',
+        'destination_lng' => 'DECIMAL(11, 8) NULL AFTER destination_lat'
+    ];
+
+    foreach ($columnsToAdd as $column => $definition) {
+        $check = $pdo->query("SHOW COLUMNS FROM ride_shares LIKE '$column'");
+        if (!$check->fetch()) {
+            $pdo->exec("ALTER TABLE ride_shares ADD COLUMN $column $definition");
+        }
+    }
+
+    $pdo->exec("UPDATE ride_shares SET pickup_location = COALESCE(pickup_location, start_location), start_location = COALESCE(start_location, pickup_location), total_seats = COALESCE(total_seats, available_seats) WHERE pickup_location IS NULL OR start_location IS NULL OR total_seats IS NULL");
+
+    $pdo->exec(<<<SQL
+        CREATE TABLE IF NOT EXISTS ride_share_bookings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ride_share_id INT NOT NULL,
+            rider_id INT NOT NULL,
+            seats_booked INT NOT NULL DEFAULT 1,
+            status ENUM('pending', 'confirmed', 'cancelled', 'completed') NOT NULL DEFAULT 'confirmed',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_ride_share_booking (ride_share_id, rider_id),
+            FOREIGN KEY (ride_share_id) REFERENCES ride_shares(id) ON DELETE CASCADE,
+            FOREIGN KEY (rider_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+SQL);
+
+    echo "Creating wallet_transactions table...\n";
+    $pdo->exec(<<<SQL
+        CREATE TABLE IF NOT EXISTS wallet_transactions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            amount DECIMAL(10, 2) NOT NULL,
+            type ENUM('credit', 'debit') NOT NULL,
+            description VARCHAR(255) NOT NULL,
+            reference VARCHAR(100) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+SQL);
+
+    echo "Creating notifications table...\n";
+    $pdo->exec(<<<SQL
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            message TEXT NOT NULL,
+            link VARCHAR(255) NULL,
+            is_read TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_notifications_user_read (user_id, is_read)
+        )
+SQL);
+
+    echo "Creating ride_share_ratings table...\n";
+    $pdo->exec(<<<SQL
+        CREATE TABLE IF NOT EXISTS ride_share_ratings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ride_share_id INT NOT NULL,
+            booking_id INT NOT NULL,
+            rider_id INT NOT NULL,
+            driver_id INT NOT NULL,
+            rating INT NOT NULL,
+            comment TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_rating_per_booking (booking_id, rider_id)
+        )
+SQL);
+
+    // 7. Ensure messages table exists and columns are clean
+    echo "Creating/Verifying messages table...\n";
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sender_id INT NOT NULL,
+            receiver_id INT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
+    echo "Creating admin_user_actions table...\n";
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS admin_user_actions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            admin_id INT NULL,
+            action ENUM('warning', 'suspension', 'unsuspension', 'note') NOT NULL DEFAULT 'note',
+            reason TEXT DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL,
+            INDEX idx_admin_user_actions_user_id (user_id),
+            INDEX idx_admin_user_actions_action (action)
+        )
+    ");
+
+    $driverRatingColumns = [
+        'vehicle_claims_match' => "TINYINT(1) NOT NULL DEFAULT 1 AFTER cleanliness",
+        'driver_lied' => "TINYINT(1) NOT NULL DEFAULT 0 AFTER vehicle_claims_match"
+    ];
+
+    foreach ($driverRatingColumns as $col => $definition) {
+        $check = $pdo->query("SHOW COLUMNS FROM driver_ratings LIKE '$col'");
+        if (!$check->fetch()) {
+            echo "Adding column '$col' to driver_ratings...\n";
+            $pdo->exec("ALTER TABLE driver_ratings ADD COLUMN $col $definition");
+        }
+    }
+
+    echo "Migrations completed successfully!\n";
+
+} catch (PDOException $e) {
+    echo "Migration failed: " . $e->getMessage() . "\n";
+    exit(1);
+}

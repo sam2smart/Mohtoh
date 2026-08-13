@@ -1,0 +1,133 @@
+/* assets/css/layout.css
+   The mobile app shell: a centered, max-width "device" frame that fills
+   the viewport on phones and sits centered on tablet/desktop. Also
+   defines the shared layer stack (map -> overlay -> header -> card ->
+   sheet -> bottom nav) every screen builds on. */
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-app-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* The single mobile "device" container every screen renders inside.
+   Height is fixed (not min-height) so it behaves like an actual phone
+   screen: content scrolls inside it, the frame itself never grows. */
+.app-shell {
+  position: relative;
+  max-width: var(--app-max-width);
+  height: 100vh;
+  height: 100dvh;
+  margin: 0 auto;
+  background: var(--color-surface);
+  overflow: hidden;
+  isolation: isolate; /* keep this shell's z-index stack self-contained */
+}
+
+/* On real desktop widths, frame it like a device so it never stretches */
+@media (min-width: 560px) {
+  .app-shell {
+    height: calc(100vh - 48px);
+    height: calc(100dvh - 48px);
+    margin-block: 24px;
+    border-radius: 28px;
+    box-shadow: var(--shadow-card);
+  }
+}
+
+/* ---- Layer stack utilities ---- */
+.layer-map        { position: absolute; inset: 0; z-index: var(--z-map); }
+.layer-overlay     { position: absolute; inset: 0; z-index: var(--z-overlay); pointer-events: none; }
+.layer-floating     { position: absolute; z-index: var(--z-floating); }
+.layer-card         { position: relative; z-index: var(--z-card); }
+.layer-sheet        { position: absolute; left: 0; right: 0; bottom: 0; z-index: var(--z-sheet); }
+/* .layer-header and .layer-bottom-nav are true viewport-fixed chrome —
+   defined once in mobile-shell.css, not here, since they must stay put
+   regardless of ANY ancestor (including .app-shell/.screen) scrolling. */
+
+/* A screen that scrolls normally (auth, wallet, profile, etc.) instead
+   of sitting on a fixed full-bleed map background. Always combined with
+   .app-shell on the same element in markup (class="app-shell screen"),
+   so the height cap comes from .app-shell itself — .screen only adds the
+   flex/overflow contract that makes .screen-scroll's overflow-y:auto
+   actually own the scrolling instead of the whole page scrolling. */
+.screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.screen-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Modifier for .screen-scroll on pages that also render
+   partials/app-header.php + partials/bottom-nav.php (both absolutely
+   positioned, like the map layer stack) so content clears them instead
+   of sitting underneath. Auth (index.php) has neither and stays on the
+   bare .screen-scroll above. */
+.screen-scroll--app {
+  padding-top: calc(var(--header-height) + var(--safe-top) + var(--space-4));
+  padding-bottom: var(--content-bottom-clearance);
+  padding-inline: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.container-pad {
+  padding-inline: var(--space-5);
+}
+
+/* ---- Full-screen map background screen (Home, Search, Live Trip) ---- */
+.map-screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+#mapCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+.map-screen .layer-overlay {
+  background: linear-gradient(180deg, rgba(10,20,20,0.35) 0%, rgba(10,20,20,0) 22%, rgba(10,20,20,0) 78%, rgba(10,20,20,0.12) 100%);
+}
+
+.map-screen__scroll {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(var(--header-height) + var(--safe-top) + 64px);
+  bottom: var(--content-bottom-clearance);
+  z-index: var(--z-card);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.map-fab-stack {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--content-bottom-clearance);
+  z-index: var(--z-floating);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Leaflet destination marker (drawRoute in map.js) */
+.mt-dest-pin { color: var(--color-danger); font-size: 1.5rem; text-shadow: 0 1px 3px rgba(0,0,0,0.35); }
+
+/* Leaflet ships its own CSS for panes/controls; this app hides the
+   default zoom control (zoomControl:false) and attribution, so no
+   further Leaflet chrome overrides are needed here. */
+.leaflet-container { background: var(--color-surface); font-family: var(--font-body); }

@@ -1,0 +1,57 @@
+/* assets/css/mobile-shell.css
+   Single source of truth for the app's "true mobile app" chrome: the
+   header and bottom nav must stay pinned to the viewport no matter what
+   scrolls underneath them (page scroll, .screen-scroll, .map-screen__scroll,
+   momentum scroll on iOS, etc). position: absolute (the old approach in
+   layout.css) only pins an element to its nearest positioned ancestor —
+   if that ancestor's box ever moves (e.g. the page itself scrolls because
+   content overflowed .app-shell), the "pinned" element moves with it.
+   position: fixed pins to the viewport itself, which is the only thing
+   that never scrolls, so it is used here for every piece of persistent
+   shell chrome.
+
+   Because .app-shell is a centered, max-width "device frame" (not full
+   viewport width past 560px), a plain `position:fixed; inset auto 0 0 auto`
+   would stretch this chrome across the whole browser window on desktop.
+   The fix already used by .sheet in components.css is reused here:
+   left: 50%; transform: translateX(-50%); max-width: var(--app-max-width) —
+   fixed to the viewport, but width-clamped and centered to match the frame. */
+
+.layer-header,
+.layer-bottom-nav {
+  position: fixed;
+  left: 50%;
+  width: 100%;
+  max-width: var(--app-max-width);
+  transform: translateX(-50%);
+}
+
+.layer-header {
+  top: 0;
+  z-index: var(--z-header);
+}
+
+.layer-bottom-nav {
+  bottom: 0;
+  z-index: var(--z-bottom-nav);
+}
+
+/* At the desktop breakpoint .app-shell is inset from the viewport edges
+   (margin-block: 24px, see layout.css) and becomes a self-contained
+   rounded card. The fixed header/bottom-nav are viewport children, not
+   descendants of .app-shell, so they must be nudged in by the same
+   inset to stay visually attached to the card's top/bottom edges. */
+@media (min-width: 560px) {
+  .layer-header { top: var(--shell-desktop-inset); }
+  .layer-bottom-nav { bottom: var(--shell-desktop-inset); }
+}
+
+/* Generic "scrollable content area that clears the fixed shell chrome"
+   utility. .screen-scroll--app and .map-screen__scroll already implement
+   this contract with their own top/bottom offsets (they need extra rules
+   beyond padding — absolute positioning, height bounds) so this class is
+   for any future plain content screen that only needs the padding half
+   of the contract without a full custom scroll region. */
+.mobile-content {
+  padding-bottom: var(--content-bottom-clearance);
+}

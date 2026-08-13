@@ -1,0 +1,6388 @@
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-03 23:41:06
+    [email_resend_count] => 12
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+PHPMailer Debug: Connection: opening to smtp.gmail.com:587, timeout=15, options=array()
+PHPMailer Debug: Connection: opened
+PHPMailer Debug: SERVER -> CLIENT: 220 smtp.gmail.com ESMTP 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: EHLO localhost
+
+PHPMailer Debug: SERVER -> CLIENT: 250-smtp.gmail.com at your service, [98.97.77.131]
+250-SIZE 35882577
+250-8BITMIME
+250-STARTTLS
+250-ENHANCEDSTATUSCODES
+250-PIPELINING
+250-CHUNKING
+250 SMTPUTF8
+
+PHPMailer Debug: CLIENT -> SERVER: STARTTLS
+
+PHPMailer Debug: SERVER -> CLIENT: 220 2.0.0 Ready to start TLS
+
+PHPMailer Debug: CLIENT -> SERVER: EHLO localhost
+
+PHPMailer Debug: SERVER -> CLIENT: 250-smtp.gmail.com at your service, [98.97.77.131]
+250-SIZE 35882577
+250-8BITMIME
+250-AUTH LOGIN PLAIN XOAUTH2 PLAIN-CLIENTTOKEN OAUTHBEARER XOAUTH
+250-ENHANCEDSTATUSCODES
+250-PIPELINING
+250-CHUNKING
+250 SMTPUTF8
+
+PHPMailer Debug: CLIENT -> SERVER: AUTH LOGIN
+
+PHPMailer Debug: SERVER -> CLIENT: 334 VXNlcm5hbWU6
+
+PHPMailer Debug: CLIENT -> SERVER: [credentials hidden]
+PHPMailer Debug: SERVER -> CLIENT: 334 UGFzc3dvcmQ6
+
+PHPMailer Debug: CLIENT -> SERVER: [credentials hidden]
+PHPMailer Debug: SERVER -> CLIENT: 235 2.7.0 Accepted
+
+PHPMailer Debug: CLIENT -> SERVER: MAIL FROM:<mohtohmerit@gmail.com>
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.1.0 OK 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: RCPT TO:<mostmerit@gmail.com>
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.1.5 OK 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: DATA
+
+PHPMailer Debug: SERVER -> CLIENT: 354 Go ahead 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: Date: Tue, 4 Aug 2026 00:56:23 +0200
+
+PHPMailer Debug: CLIENT -> SERVER: To: mostmerit@gmail.com
+
+PHPMailer Debug: CLIENT -> SERVER: From: MohToh Support <mohtohmerit@gmail.com>
+
+PHPMailer Debug: CLIENT -> SERVER: Reply-To: mohtohmerit@gmail.com
+
+PHPMailer Debug: CLIENT -> SERVER: Subject: Verify your MohToh account
+
+PHPMailer Debug: CLIENT -> SERVER: Message-ID: <09SrmAv9rL4qUR2CxTgECNy6z11guurHbehYlUj4g0@localhost>
+
+PHPMailer Debug: CLIENT -> SERVER: X-Mailer: PHPMailer 7.1.1 (https://github.com/PHPMailer/PHPMailer)
+
+PHPMailer Debug: CLIENT -> SERVER: MIME-Version: 1.0
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: multipart/alternative;
+
+PHPMailer Debug: CLIENT -> SERVER:  boundary="b1=_09SrmAv9rL4qUR2CxTgECNy6z11guurHbehYlUj4g0"
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_09SrmAv9rL4qUR2CxTgECNy6z11guurHbehYlUj4g0
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: text/plain; charset=us-ascii
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: Verify your MohToh account
+
+PHPMailer Debug: CLIENT -> SERVER:   Hi Merit Smart,
+
+PHPMailer Debug: CLIENT -> SERVER:   Tap the button below to verify your email address. This link expires in 60 minutes.
+
+PHPMailer Debug: CLIENT -> SERVER:   
+
+PHPMailer Debug: CLIENT -> SERVER:     Verify Email
+
+PHPMailer Debug: CLIENT -> SERVER:   
+
+PHPMailer Debug: CLIENT -> SERVER:   If you didn't create a MohToh account, you can safely ignore this email.
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_09SrmAv9rL4qUR2CxTgECNy6z11guurHbehYlUj4g0
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: text/html; charset=us-ascii
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+PHPMailer Debug: CLIENT -> SERVER:   <h2 style="color:#0F8B8D;">Verify your MohToh account</h2>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p>Hi Merit Smart,</p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p>Tap the button below to verify your email address. This link expires in 60 minutes.</p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p style="text-align:center;margin:32px 0;">
+
+PHPMailer Debug: CLIENT -> SERVER:     <a href="http://app.mohtoh.com.ng/Mostmerit/merit_drives/verify-email.php?token=0c01f88ebd40640eae1ae2bf668170ccab762cadbb26a27eb1cb8f0894f0bf67" style="background:#0F8B8D;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:bold;display:inline-block;">Verify Email</a>
+
+PHPMailer Debug: CLIENT -> SERVER:   </p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p style="color:#888;font-size:12px;">If you didn't create a MohToh account, you can safely ignore this email.</p>
+
+PHPMailer Debug: CLIENT -> SERVER: </div>
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_09SrmAv9rL4qUR2CxTgECNy6z11guurHbehYlUj4g0--
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: .
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.0.0 OK  1785797801 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: QUIT
+
+PHPMailer Debug: SERVER -> CLIENT: 221 2.0.0 closing connection 5b1f17b1804b1-49807ba6abesm203468825e9.2 - gsmtp
+
+PHPMailer Debug: Connection: closed
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-04 00:56:22
+    [email_resend_count] => 13
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-04 00:56:22
+    [email_resend_count] => 13
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+PHPMailer Debug: Connection: opening to smtp.gmail.com:587, timeout=15, options=array()
+PHPMailer Debug: Connection: opened
+PHPMailer Debug: SERVER -> CLIENT: 220 smtp.gmail.com ESMTP 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: EHLO localhost
+
+PHPMailer Debug: SERVER -> CLIENT: 250-smtp.gmail.com at your service, [98.97.77.131]
+250-SIZE 35882577
+250-8BITMIME
+250-STARTTLS
+250-ENHANCEDSTATUSCODES
+250-PIPELINING
+250-CHUNKING
+250 SMTPUTF8
+
+PHPMailer Debug: CLIENT -> SERVER: STARTTLS
+
+PHPMailer Debug: SERVER -> CLIENT: 220 2.0.0 Ready to start TLS
+
+PHPMailer Debug: CLIENT -> SERVER: EHLO localhost
+
+PHPMailer Debug: SERVER -> CLIENT: 250-smtp.gmail.com at your service, [98.97.77.131]
+250-SIZE 35882577
+250-8BITMIME
+250-AUTH LOGIN PLAIN XOAUTH2 PLAIN-CLIENTTOKEN OAUTHBEARER XOAUTH
+250-ENHANCEDSTATUSCODES
+250-PIPELINING
+250-CHUNKING
+250 SMTPUTF8
+
+PHPMailer Debug: CLIENT -> SERVER: AUTH LOGIN
+
+PHPMailer Debug: SERVER -> CLIENT: 334 VXNlcm5hbWU6
+
+PHPMailer Debug: CLIENT -> SERVER: [credentials hidden]
+PHPMailer Debug: SERVER -> CLIENT: 334 UGFzc3dvcmQ6
+
+PHPMailer Debug: CLIENT -> SERVER: [credentials hidden]
+PHPMailer Debug: SERVER -> CLIENT: 235 2.7.0 Accepted
+
+PHPMailer Debug: CLIENT -> SERVER: MAIL FROM:<mohtohmerit@gmail.com>
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.1.0 OK 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: RCPT TO:<mostmerit@gmail.com>
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.1.5 OK 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: DATA
+
+PHPMailer Debug: SERVER -> CLIENT: 354 Go ahead 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: Date: Tue, 4 Aug 2026 00:57:33 +0200
+
+PHPMailer Debug: CLIENT -> SERVER: To: mostmerit@gmail.com
+
+PHPMailer Debug: CLIENT -> SERVER: From: MohToh Support <mohtohmerit@gmail.com>
+
+PHPMailer Debug: CLIENT -> SERVER: Reply-To: mohtohmerit@gmail.com
+
+PHPMailer Debug: CLIENT -> SERVER: Subject: Verify your MohToh account
+
+PHPMailer Debug: CLIENT -> SERVER: Message-ID: <7vkUd2eEIk7S4zsnPDJGhwb4SzGavfbyjW4hYziA0jE@localhost>
+
+PHPMailer Debug: CLIENT -> SERVER: X-Mailer: PHPMailer 7.1.1 (https://github.com/PHPMailer/PHPMailer)
+
+PHPMailer Debug: CLIENT -> SERVER: MIME-Version: 1.0
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: multipart/alternative;
+
+PHPMailer Debug: CLIENT -> SERVER:  boundary="b1=_7vkUd2eEIk7S4zsnPDJGhwb4SzGavfbyjW4hYziA0jE"
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_7vkUd2eEIk7S4zsnPDJGhwb4SzGavfbyjW4hYziA0jE
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: text/plain; charset=us-ascii
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: Verify your MohToh account
+
+PHPMailer Debug: CLIENT -> SERVER:   Hi Merit Smart,
+
+PHPMailer Debug: CLIENT -> SERVER:   Tap the button below to verify your email address. This link expires in 60 minutes.
+
+PHPMailer Debug: CLIENT -> SERVER:   
+
+PHPMailer Debug: CLIENT -> SERVER:     Verify Email
+
+PHPMailer Debug: CLIENT -> SERVER:   
+
+PHPMailer Debug: CLIENT -> SERVER:   If you didn't create a MohToh account, you can safely ignore this email.
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_7vkUd2eEIk7S4zsnPDJGhwb4SzGavfbyjW4hYziA0jE
+
+PHPMailer Debug: CLIENT -> SERVER: Content-Type: text/html; charset=us-ascii
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+PHPMailer Debug: CLIENT -> SERVER:   <h2 style="color:#0F8B8D;">Verify your MohToh account</h2>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p>Hi Merit Smart,</p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p>Tap the button below to verify your email address. This link expires in 60 minutes.</p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p style="text-align:center;margin:32px 0;">
+
+PHPMailer Debug: CLIENT -> SERVER:     <a href="http://app.mohtoh.com.ng/Mostmerit/merit_drives/verify-email.php?token=7cca113c400bdefa44d14ff042dcab967d2a7cdbf04211ddb5c9e890732ee926" style="background:#0F8B8D;color:#fff;text-decoration:none;padding:14px 28px;border-radius:999px;font-weight:bold;display:inline-block;">Verify Email</a>
+
+PHPMailer Debug: CLIENT -> SERVER:   </p>
+
+PHPMailer Debug: CLIENT -> SERVER:   <p style="color:#888;font-size:12px;">If you didn't create a MohToh account, you can safely ignore this email.</p>
+
+PHPMailer Debug: CLIENT -> SERVER: </div>
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: --b1=_7vkUd2eEIk7S4zsnPDJGhwb4SzGavfbyjW4hYziA0jE--
+
+PHPMailer Debug: CLIENT -> SERVER: 
+
+PHPMailer Debug: CLIENT -> SERVER: .
+
+PHPMailer Debug: SERVER -> CLIENT: 250 2.0.0 OK  1785797864 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: CLIENT -> SERVER: QUIT
+
+PHPMailer Debug: SERVER -> CLIENT: 221 2.0.0 closing connection 5b1f17b1804b1-49949fd88c8sm35480135e9.7 - gsmtp
+
+PHPMailer Debug: Connection: closed
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-04 00:57:33
+    [email_resend_count] => 14
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-04 01:03:19
+    [email_resend_count] => 15
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+Sending email. Host: smtp.gmail.com, Username: noreply@mohtoh.com.ng, Port: 587, Encryption: tls, From: noreply@mohtoh.com.ng
+PHPMailer SMTP error: SMTP Error: Could not authenticate.
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+Sending email. Host: smtp.gmail.com, Username: noreply@mohtoh.com.ng, Port: 587, Encryption: tls, From: noreply@mohtoh.com.ng
+PHPMailer SMTP error: SMTP Error: Could not authenticate.
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+Sending email. Host: smtp.gmail.com, Username: noreply@mohtoh.com.ng, Port: 587, Encryption: tls, From: noreply@mohtoh.com.ng
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+PHPMailer SMTP error: SMTP Error: Could not authenticate.
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 178
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit@gmail.com
+    [fullname] => Merit Smart
+    [last_verification_sent] => 2026-08-04 01:07:19
+    [email_resend_count] => 16
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 179
+DEBUG: User fetched: Array
+(
+    [email] => rccgchristhillchapel@gmail.com
+    [fullname] => RCCG CHC
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 252
+DEBUG: User fetched: Array
+(
+    [email] => verify1786382687_0@example.com
+    [fullname] => Test Driver
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 253
+DEBUG: User fetched: Array
+(
+    [email] => verify1786382687_1@example.com
+    [fullname] => Test Driver
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 254
+DEBUG: User fetched: Array
+(
+    [email] => verify1786382687_3@example.com
+    [fullname] => Test Driver
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 276
+DEBUG: User fetched: Array
+(
+    [email] => keketest201@example.com
+    [fullname] => Keke Test User
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 277
+DEBUG: User fetched: Array
+(
+    [email] => cartest202@example.com
+    [fullname] => Car Test User
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 278
+DEBUG: User fetched: Array
+(
+    [email] => ridertest203@example.com
+    [fullname] => Rider Test User
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 279
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit46@gmail.com
+    [fullname] => Segun Ajayi
+    [last_verification_sent] => 2026-08-10 21:32:29
+    [email_resend_count] => 1
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 280
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394638_0@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 281
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394638_1@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 282
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394638_2@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 283
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394806_0@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 284
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394806_1@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 285
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394806_2@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 286
+DEBUG: User fetched: Array
+(
+    [email] => rep1786394806_3@example.com
+    [fullname] => Repro Tester
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 287
+DEBUG: User fetched: Array
+(
+    [email] => rccgchristhillchapel@gmail.com
+    [fullname] => RCCG CHC
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 287
+DEBUG: User fetched: Array
+(
+    [email] => rccgchristhillchapel@gmail.com
+    [fullname] => RCCG CHC
+    [last_verification_sent] => 2026-08-10 23:03:35
+    [email_resend_count] => 1
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+    [action] => resend_email
+)
+
+DEBUG: send_email_verification called for UserID: 279
+DEBUG: User fetched: Array
+(
+    [email] => mostmerit46@gmail.com
+    [fullname] => Segun Ajayi
+    [last_verification_sent] => 2026-08-10 21:37:35
+    [email_resend_count] => 2
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+DEBUG: send_email_verification called for UserID: 288
+DEBUG: User fetched: Array
+(
+    [email] => repro.rider.26325@example.com
+    [fullname] => Repro Testrider
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 289
+DEBUG: User fetched: Array
+(
+    [email] => repro.keke.26014@example.com
+    [fullname] => Repro Testkeke
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 290
+DEBUG: User fetched: Array
+(
+    [email] => var.12826@example.com
+    [fullname] => Var Test
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 291
+DEBUG: User fetched: Array
+(
+    [email] => apache.rider.1531@example.com
+    [fullname] => Apache Test
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 292
+DEBUG: User fetched: Array
+(
+    [email] => apache.keke.11558@example.com
+    [fullname] => Apache Test
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 293
+DEBUG: User fetched: Array
+(
+    [email] => exact.keke.4205@example.com
+    [fullname] => Exact Keke
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 294
+DEBUG: User fetched: Array
+(
+    [email] => exact.driver.22772@example.com
+    [fullname] => Exact Driver
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 295
+DEBUG: User fetched: Array
+(
+    [email] => final.rider.27800@example.com
+    [fullname] => Final rider
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 296
+DEBUG: User fetched: Array
+(
+    [email] => final.driver.27800@example.com
+    [fullname] => Final driver
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+DEBUG: send_email_verification called for UserID: 297
+DEBUG: User fetched: Array
+(
+    [email] => final.keke.27800@example.com
+    [fullname] => Final keke
+    [last_verification_sent] => 
+    [email_resend_count] => 0
+)
+
+Sending email. Host: smtp.gmail.com, Username: mohtohmerit@gmail.com, Port: 587, Encryption: tls, From: mohtohmerit@gmail.com
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+
+API verification.php called. Input: Array
+(
+)
+

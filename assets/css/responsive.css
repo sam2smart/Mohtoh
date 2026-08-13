@@ -1,0 +1,16 @@
+/* assets/css/responsive.css
+   Breakpoint adjustments only — component structure stays identical
+   across sizes, per the "never a traditional desktop layout" rule. */
+
+/* Small phones: tighten the padding scale slightly */
+@media (max-width: 360px) {
+  .container-pad { padding-inline: var(--space-4); }
+  .sheet { padding-inline: var(--space-4); }
+}
+
+/* Tablet and up: the .app-shell in layout.css already centers and caps
+   width at --app-max-width; this just lifts it off the top of the
+   viewport so it doesn't look clipped on tall desktop screens. */
+@media (min-width: 560px) {
+  html, body { background: var(--color-app-bg); }
+}

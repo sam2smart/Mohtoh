@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(chromium-cli --help)",
+      "Bash(node -e \"require\\('playwright'\\); console.log\\('playwright OK'\\)\")",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npx --yes playwright screenshot --viewport-size=430,900 \"http://app.mohtoh.com.ng/Mostmerit/merit_drives/index.php\" index-screenshot.png)",
+      "Bash(mysql -u root -e \"SELECT id, fullname, phone, email, user_type, wallet_balance FROM merit_drives.users WHERE fullname LIKE '%kole%' OR fullname LIKE '%femi%';\")",
+      "PowerShell(& \"C:\\\\xampp\\\\php\\\\php.exe\" \"c:\\\\xampp\\\\htdocs\\\\Mostmerit\\\\merit_drives\\\\database\\\\fix_malformed_user_ids.php\")",
+      "Read(//c/tmp/**)",
+      "Bash(curl -s -b driver_cookies.txt -X POST http://app.mohtoh.com.ng/Mostmerit/merit_drives/api/driver-api.php -H 'Content-Type: application/json' -d '{\"action\":\"setup_vehicle\",\"make\":\"Toyota\",\"model\":\"Corolla\",\"year\":2018,\"color\":\"Blue\",\"plate_number\":\"TEST-123XY\",\"ac_available\":1,\"cleanliness\":\"Good\",\"comfort_level\":\"Standard\",\"seats\":4,\"luggage_capacity\":\"Standard\"}')",
+      "Bash(curl -s -o rider_profile.html -w \"%{http_code}\\\\n\" -b rider_cookies.txt http://app.mohtoh.com.ng/Mostmerit/merit_drives/rider/profile.php)",
+      "Bash(curl -s -o driver_profile.html -w \"%{http_code}\\\\n\" -b driver_cookies.txt http://app.mohtoh.com.ng/Mostmerit/merit_drives/driver/profile.php)",
+      "Bash(cd /Users/dev/workspace-1954ad5f && ls -la)",
+      "Bash(cd /d/core-api && ls -la)",
+      "Read(//Users/dev/**)",
+      "Bash(pwd; echo *)",
+      "Bash(grep -v '^$')",
+      "Bash(grep -rhoiE \"CREATE TABLE \\(IF NOT EXISTS \\)?[\\\\`']?[a-z_]+\" database/)",
+      "Bash(grep -nE '\\\\$action ?=== ?'\\\\''|\\\\$action ?== ?\"|case '\\\\''|if \\\\\\(\\\\$action' rideshare.php)",
+      "Bash(awk '{print $2}')",
+      "Bash(grep -oiE \"ADD \\(COLUMN \\)?[\\\\`']?[a-z_]+\")",
+      "Bash(php -v)",
+      "Read(//c/xampp/mysql/bin/**)",
+      "Read(//c/xampp/php/**)",
+      "Bash(tasklist)",
+      "Bash(\"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root merit_drives -e \"DESCRIBE vehicles;\")",
+      "Bash(\"C:\\\\xampp\\\\mysql\\\\bin\\\\mysql.exe\" -u root merit_drives -e \"DESCRIBE vehicle_verifications;\")"
+    ]
+  }
+}

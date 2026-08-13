@@ -1,0 +1,36 @@
+/* assets/css/utilities.css
+   Small single-purpose helpers. Reach for these before writing a new
+   one-off rule in a screen's own markup. */
+
+.u-flex { display: flex; }
+.u-flex-col { display: flex; flex-direction: column; }
+.u-items-center { align-items: center; }
+.u-justify-center { justify-content: center; }
+.u-justify-between { justify-content: space-between; }
+.u-gap-1 { gap: var(--space-1); }
+.u-gap-2 { gap: var(--space-2); }
+.u-gap-3 { gap: var(--space-3); }
+.u-gap-4 { gap: var(--space-4); }
+
+.u-text-center { text-align: center; }
+.u-text-soft { color: var(--color-text-soft); }
+.u-text-faint { color: var(--color-text-faint); }
+.u-text-primary { color: var(--color-primary); }
+.u-text-sm { font-size: var(--text-sm); }
+.u-text-xs { font-size: var(--text-xs); }
+
+.u-mt-2 { margin-top: var(--space-2); }
+.u-mt-4 { margin-top: var(--space-4); }
+.u-mt-6 { margin-top: var(--space-6); }
+.u-mb-2 { margin-bottom: var(--space-2); }
+.u-mb-4 { margin-bottom: var(--space-4); }
+.u-mb-6 { margin-bottom: var(--space-6); }
+
+.u-w-full { width: 100%; }
+.u-hidden { display: none !important; }
+
+.u-visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
