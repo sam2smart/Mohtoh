@@ -31,6 +31,8 @@ $isOnline = $currentUser['is_online'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK join/withdrawal requests). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh Driver — Home</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -170,7 +172,7 @@ $isOnline = $currentUser['is_online'];
 
     <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
     <?php include __DIR__ . '/../partials/messages-sheet.php'; ?>
-    <?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+    <?php include __DIR__ . '/../partials/network-sheet.php'; ?>
 
     <!-- ================= Upcoming rides sheet ================= -->
     <div class="sheet" id="upcomingRidesSheet" role="dialog" aria-modal="true">
@@ -538,7 +540,7 @@ $isOnline = $currentUser['is_online'];
 <script src="../assets/js/navigation.js"></script>
 <script src="../assets/js/map.js"></script>
 <script src="../assets/js/messages.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script src="../assets/js/driver.js"></script>
 <script src="../assets/js/driver-ride-creation.js"></script>
 </body>

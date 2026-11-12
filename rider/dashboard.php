@@ -29,6 +29,8 @@ $userType = 'rider';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK join/withdrawal requests). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh — Home</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -129,7 +131,7 @@ $userType = 'rider';
 
     <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
     <?php include __DIR__ . '/../partials/messages-sheet.php'; ?>
-    <?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+    <?php include __DIR__ . '/../partials/network-sheet.php'; ?>
     <div class="sheet" id="rideDetailSheet" role="dialog" aria-modal="true">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
@@ -237,7 +239,7 @@ $userType = 'rider';
 <script src="../assets/js/search.js"></script>
 <script src="../assets/js/rider-trip.js"></script>
 <script src="../assets/js/messages.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script>
     document.getElementById('recenterBtn')?.addEventListener('click', () => centerMapOnUser());
 </script>

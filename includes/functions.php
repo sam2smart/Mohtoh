@@ -168,6 +168,52 @@ function require_super_admin($pdo) {
     }
 }
 
+// ---------------------------------------------------------------
+// CSRF protection for authenticated, state-changing JSON endpoints.
+//
+// The app historically had no CSRF layer (session auth + same-origin
+// fetch only). MOHTOH NETWORK introduces authenticated state-changing
+// actions the browser initiates via JS — joining the programme,
+// requesting a withdrawal, admin partner/reward/withdrawal decisions —
+// so those endpoints (api/network.php, api/network-admin.php) carry a
+// per-session token that must accompany the request. This is
+// intentionally self-contained and used ONLY by the new endpoints; it does
+// not retrofit or alter any existing action's request contract.
+//
+// The token is a 32-byte CSPRNG value kept in the session. It is exposed to
+// same-origin pages that need it (rendered into a meta tag / JS global) and
+// echoed back in the X-CSRF-Token header or a csrf_token field.
+function csrf_token(): string {
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrf_validate(?string $token): bool {
+    if (!is_string($token) || $token === '' || empty($_SESSION['csrf_token'])) {
+        return false;
+    }
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+// Reads the token from the X-CSRF-Token header first, then a csrf_token body
+// field, and aborts the request with a JSON error if it is missing/invalid.
+// Call at the top of every authenticated state-changing handler that a page's
+// JavaScript invokes.
+function require_csrf(?array $input = null): void {
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+    if ($token === null && is_array($input)) {
+        $token = $input['csrf_token'] ?? null;
+    }
+    if ($token === null) {
+        $token = $_POST['csrf_token'] ?? null;
+    }
+    if (!csrf_validate(is_string($token) ? $token : null)) {
+        json_response('error', 'Your session has expired. Please refresh the page and try again.');
+    }
+}
+
 function calculate_distance_km($lat1, $lng1, $lat2, $lng2) {
     if ($lat1 === null || $lng1 === null || $lat2 === null || $lng2 === null) {
         return 0.0;
@@ -1526,22 +1572,34 @@ function release_ride_reservation($pdo, $rideShareId) {
 // gap that would otherwise leave every admin-completed ride's
 // reservation stuck open forever.
 function settle_ride_completion($pdo, $rideId) {
+    require_once __DIR__ . '/network.php';
+
     $stmt = $pdo->prepare("SELECT id, payment_method FROM ride_share_bookings WHERE ride_share_id = ? AND status = 'completed'");
     $stmt->execute([$rideId]);
     $completedBookings = $stmt->fetchAll();
 
     $totalEarningCredited = 0.0;
     foreach ($completedBookings as $booking) {
-        if ($booking['payment_method'] !== 'wallet') {
-            continue; // direct payments settle via confirm_direct_payment
+        if ($booking['payment_method'] === 'wallet') {
+            $stmt2 = $pdo->prepare("SELECT driver_earning_amount, driver_id FROM payments WHERE booking_id = ? AND payment_method = 'wallet'");
+            $stmt2->execute([$booking['id']]);
+            $paymentRow = $stmt2->fetch();
+            $earning = (float)($paymentRow['driver_earning_amount'] ?? 0);
+            if ($earning > 0) {
+                credit_wallet($pdo, $paymentRow['driver_id'], $earning, 'driver_earning', "Earning from completed ride #{$rideId} (booking #{$booking['id']})", $rideId, $booking['id']);
+                $totalEarningCredited += $earning;
+            }
         }
-        $stmt2 = $pdo->prepare("SELECT driver_earning_amount, driver_id FROM payments WHERE booking_id = ? AND payment_method = 'wallet'");
-        $stmt2->execute([$booking['id']]);
-        $paymentRow = $stmt2->fetch();
-        $earning = (float)($paymentRow['driver_earning_amount'] ?? 0);
-        if ($earning > 0) {
-            credit_wallet($pdo, $paymentRow['driver_id'], $earning, 'driver_earning', "Earning from completed ride #{$rideId} (booking #{$booking['id']})", $rideId, $booking['id']);
-            $totalEarningCredited += $earning;
+        // direct payments settle their driver-earning credit via
+        // confirm_direct_payment, but EVERY completed booking (wallet
+        // or direct) is a candidate for a MOHTOH NETWORK reward — the
+        // engine itself checks payment confirmation and is idempotent,
+        // so it's safe to call here regardless of payment method or
+        // call order. Never let a NETWORK failure affect settlement.
+        try {
+            network_settle_booking_reward($pdo, $booking['id']);
+        } catch (Throwable $e) {
+            error_log('MOHTOH NETWORK settlement failed for booking #' . $booking['id'] . ': ' . $e->getMessage());
         }
     }
 

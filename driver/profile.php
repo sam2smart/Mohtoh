@@ -25,6 +25,8 @@ $userType = 'driver';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK join/withdrawal requests). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh Driver — Profile</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -96,7 +98,7 @@ $userType = 'driver';
                 <button type="button" class="menu-row" data-open-sheet-id="earningsSheet"><i class="bi bi-cash-stack"></i><span>Earnings summary</span><i class="bi bi-chevron-right"></i></button>
                 <a href="dashboard.php?open=wallet" class="menu-row" style="color:inherit;text-decoration:none;"><i class="bi bi-wallet2"></i><span>Wallet</span><i class="bi bi-chevron-right"></i></a>
                 <button type="button" class="menu-row" data-open-sheet-id="ratingsReceivedSheet"><i class="bi bi-star"></i><span>Ratings received</span><i class="bi bi-chevron-right"></i></button>
-                <button type="button" class="menu-row" data-open-sheet-id="communityRewardsSheet"><i class="bi bi-people-fill"></i><span>Grow My Community</span><i class="bi bi-chevron-right"></i></button>
+                <button type="button" class="menu-row" data-open-sheet-id="networkSheet"><i class="bi bi-share-fill"></i><span>MOHTOH NETWORK</span><i class="bi bi-chevron-right"></i></button>
                 <button type="button" class="menu-row" data-open-sheet-id="premiumCenterSheet"><i class="bi bi-award"></i><span>Premium Center</span><span class="status-pill" id="profilePremiumPill" style="margin-left:auto;margin-right:8px;">—</span><i class="bi bi-chevron-right"></i></button>
                 <button type="button" class="menu-row" data-open-sheet-id="accountSettingsSheet"><i class="bi bi-gear"></i><span>Account settings</span><i class="bi bi-chevron-right"></i></button>
             </div>
@@ -111,7 +113,7 @@ $userType = 'driver';
 <div class="sheet-scrim" data-sheet-scrim></div>
 
 <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
-<?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+<?php include __DIR__ . '/../partials/network-sheet.php'; ?>
 
 <!-- ================= Edit profile sheet ================= -->
 <div class="sheet" id="editProfileSheet" role="dialog" aria-modal="true">
@@ -259,7 +261,7 @@ $userType = 'driver';
 <script src="../assets/js/mohtoh-bridge.js"></script>
 <script src="../assets/js/pwa-init.js"></script>
 <script src="../assets/js/navigation.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script src="../assets/js/profile.js"></script>
 </body>
 </html>

@@ -16,12 +16,15 @@ header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'validate_code') {
     // Public — no login required. Used by the registration sheet to show
-    // "Invited by X" before the account even exists.
+    // "Invited by X" before the account even exists. Superseded: looks up
+    // MOHTOH NETWORK's network_partners.referral_code now (Community
+    // Rewards' users.referral_code no longer attributes new signups —
+    // see includes/network.php / api/auth.php).
     $code = trim((string)($_GET['code'] ?? ''));
     if ($code === '') {
         json_response('error', 'A referral code is required.');
     }
-    $stmt = $pdo->prepare("SELECT fullname, user_type FROM users WHERE referral_code = ?");
+    $stmt = $pdo->prepare("SELECT u.fullname, u.user_type FROM network_partners p JOIN users u ON u.id = p.user_id WHERE p.referral_code = ? AND p.status = 'approved'");
     $stmt->execute([$code]);
     $referrer = $stmt->fetch();
     if (!$referrer) {

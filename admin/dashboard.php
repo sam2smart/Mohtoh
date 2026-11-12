@@ -17,6 +17,8 @@ if ($_SESSION['user_type'] !== 'admin') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK admin actions). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>Admin Dashboard - Merit Drives</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -119,6 +121,7 @@ if ($_SESSION['user_type'] !== 'admin') {
             <a class="nav-link" href="#" data-tab="diagnostics"><i class="fas fa-heart-pulse me-2"></i>Diagnostics</a>
             <a class="nav-link" href="#" data-tab="chat-monitoring"><i class="fas fa-comments me-2"></i>Chat Monitoring</a>
             <a class="nav-link" href="#" data-tab="community-growth"><i class="fas fa-people-group me-2"></i>Community Growth</a>
+            <a class="nav-link" href="#" data-tab="mohtoh-network"><i class="fas fa-share-nodes me-2"></i>MOHTOH NETWORK</a>
         </nav>
         <div class="mt-5 border-top border-secondary pt-3">
             <button class="btn btn-outline-light btn-sm w-100" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</button>
@@ -1179,6 +1182,196 @@ if ($_SESSION['user_type'] !== 'admin') {
                     </div>
                 </div>
             </section>
+
+            <section id="tab-mohtoh-network" class="tab-pane">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="fw-bold mb-0"><i class="fas fa-share-nodes me-2"></i>MOHTOH NETWORK</h5>
+                        <small class="text-muted">Share the Journey. Create Opportunity. — direct referral &amp; revenue-share programme.</small>
+                    </div>
+                    <ul class="nav nav-pills" id="net-subtabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" data-netsub="overview">Overview</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="settings">Settings</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="partners">Partners</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="referrals">Referrals</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="rewards">Rewards</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="withdrawals">Withdrawals</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="fraud">Fraud</a></li>
+                    </ul>
+                </div>
+                <div class="alert d-none" id="net-alert"></div>
+
+                <div class="net-subtab" id="net-sub-overview">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Network Partners</div><h3 class="fw-bold mb-0" id="net-ov-partners">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Pending Approval</div><h3 class="fw-bold mb-0" id="net-ov-pending">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Active Referrals</div><h3 class="fw-bold mb-0" id="net-ov-active-referrals">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Converted (1st ride)</div><h3 class="fw-bold mb-0" id="net-ov-converted">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Open Fraud Flags</div><h3 class="fw-bold mb-0" id="net-ov-fraud">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Withdrawals Paid</div><h3 class="fw-bold mb-0" id="net-ov-withdrawn">₦0</h3></div></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0"><div class="card-body">
+                                <h6 class="fw-bold mb-3">Reward liability</h6>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Total generated</span><strong id="net-ov-generated">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Pending (on hold)</span><strong id="net-ov-rpending">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Available for withdrawal</span><strong id="net-ov-ravailable">₦0</strong></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted">Reversed</span><strong id="net-ov-rreversed">₦0</strong></div>
+                            </div></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0"><div class="card-body">
+                                <h6 class="fw-bold mb-3">Net contribution</h6>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Referral-generated commission</span><strong id="net-ov-commission">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Minus rewards generated</span><strong id="net-ov-generated2">₦0</strong></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted">= Net contribution</span><strong id="net-ov-net" class="text-success">₦0</strong></div>
+                            </div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-settings">
+                    <div class="card shadow-sm border-0 mb-4"><div class="card-body">
+                        <h6 class="fw-bold mb-3">Programme switches</h6>
+                        <form id="net-settings-form" class="row g-3">
+                            <div class="col-md-3"><label class="form-label">MOHTOH NETWORK enabled</label><select class="form-select form-select-sm" id="net-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">New partner registrations</label><select class="form-select form-select-sm" id="net-registrations-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Referral links</label><select class="form-select form-select-sm" id="net-links-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Reward generation</label><select class="form-select form-select-sm" id="net-rewards-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Withdrawals</label><select class="form-select form-select-sm" id="net-withdrawals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Driver referral rewards</label><select class="form-select form-select-sm" id="net-driver-referrals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Passenger referral rewards</label><select class="form-select form-select-sm" id="net-passenger-referrals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">External partner participation</label><select class="form-select form-select-sm" id="net-external-partners-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Maintenance mode</label><select class="form-select form-select-sm" id="net-maintenance-mode"><option value="0">Off</option><option value="1">On</option></select></div>
+                            <div class="col-md-3"><label class="form-label text-danger">Emergency: suspend ALL payouts</label><select class="form-select form-select-sm" id="net-emergency-payout-suspended"><option value="0">Off</option><option value="1">Suspended</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Auto-approve new partners</label><select class="form-select form-select-sm" id="net-partner-auto-approve"><option value="0">Manual review</option><option value="1">Auto-approve</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Programme launch date</label><input type="datetime-local" class="form-control form-control-sm" id="net-launch-at"></div>
+                            <div class="col-md-3"><label class="form-label">Programme closing date</label><input type="datetime-local" class="form-control form-control-sm" id="net-closes-at"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Reward configuration</h6>
+                            <div class="col-md-3"><label class="form-label">Driver referral reward (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-driver-reward-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Passenger referral reward (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-passenger-reward-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Combined reward ceiling (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-combined-ceiling-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Earning duration (days)</label><input type="number" min="1" class="form-control form-control-sm" id="net-earning-days"></div>
+                            <div class="col-md-3"><label class="form-label">Minimum withdrawal (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-min-withdrawal"></div>
+                            <div class="col-md-3"><label class="form-label">Registration bonus (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-registration-bonus"></div>
+                            <div class="col-md-3"><label class="form-label">Reward holding period (days)</label><input type="number" min="0" class="form-control form-control-sm" id="net-reward-hold-days"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Financial controls <span class="text-muted small fw-normal">(0 = unlimited)</span></h6>
+                            <div class="col-md-3"><label class="form-label">Total reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-total-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Daily reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-daily-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Monthly reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-monthly-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Max combined payout/txn (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-combined-payout-per-txn"></div>
+                            <div class="col-md-3"><label class="form-label">Max withdrawal/day (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-withdrawal-per-day"></div>
+                            <div class="col-md-3"><label class="form-label">Max withdrawal/month (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-withdrawal-per-month"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Fraud thresholds <span class="text-muted small fw-normal">(flags only — never auto-blocks)</span></h6>
+                            <div class="col-md-4"><label class="form-label">Max new referrals / partner / day</label><input type="number" min="0" class="form-control form-control-sm" id="net-fraud-velocity-max"></div>
+                            <div class="col-md-4"><label class="form-label">Max rewarded bookings / same driver-rider pair</label><input type="number" min="0" class="form-control form-control-sm" id="net-fraud-same-pair-max"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Transparency</h6>
+                            <div class="col-md-6"><label class="form-label">Announcement banner</label><input type="text" class="form-control form-control-sm" id="net-announcement" placeholder="Shown to partners on their dashboard"></div>
+                            <div class="col-md-2"><label class="form-label">Terms version</label><input type="text" class="form-control form-control-sm" id="net-terms-version"></div>
+                            <div class="col-md-12"><label class="form-label">Programme terms &amp; conditions</label><textarea class="form-control form-control-sm" id="net-terms-text" rows="4"></textarea></div>
+
+                            <div class="col-12"><button type="submit" class="btn btn-primary">Save MOHTOH NETWORK Settings</button></div>
+                        </form>
+                    </div></div>
+
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">Campaigns</h6>
+                            <button class="btn btn-outline-primary btn-sm" type="button" id="net-new-campaign-btn">New Campaign</button>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Name</th><th>Driver %</th><th>Passenger %</th><th>Ceiling %</th><th>Window</th><th>Status</th><th></th></tr></thead>
+                            <tbody id="net-campaigns-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-partners">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" id="net-p-q" placeholder="Search name, phone, email or code"></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-p-status"><option value="">Any status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-p-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Partner</th><th>Code</th><th>Status</th><th>Referrals</th><th>Lifetime Rewards</th><th>Joined</th><th></th></tr></thead>
+                            <tbody id="net-partners-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-partners-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-referrals">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="net-r-q" placeholder="Search referrer or referred"></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-r-category"><option value="">Any category</option><option value="driver">Driver</option><option value="passenger">Passenger</option></select></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-r-status"><option value="">Any status</option><option value="registered">Registered</option><option value="verified">Verified</option><option value="active">Active (earning)</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-r-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Referrer</th><th>Referred</th><th>Category</th><th>Status</th><th>Earning window</th><th>Qualifying rides</th><th>Rewards</th><th></th></tr></thead>
+                            <tbody id="net-referrals-body"><tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-referrals-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-rewards">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <!-- No "Withdrawn"/"Suspended" options: a reward row's own status never
+                                 reaches either value today — withdrawal draws from the aggregate
+                                 available pool (see docs/mohtoh-network.md), and no reward-level
+                                 suspend action exists yet (only partner-level suspension does).
+                                 Listing them here would silently always return zero rows. -->
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-rw-status"><option value="">Any status</option><option value="pending">Pending</option><option value="available">Available</option><option value="reversed">Reversed</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-rw-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Beneficiary</th><th>Role</th><th>Commission base</th><th>%</th><th>Reward</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                            <tbody id="net-rewards-body"><tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-rewards-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-withdrawals">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-w-status"><option value="">Any status</option><option value="pending">Pending</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="paid">Paid</option><option value="rejected">Rejected</option><option value="failed">Failed</option><option value="reversed">Reversed</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-w-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Partner</th><th>Amount</th><th>Bank</th><th>Status</th><th>Requested</th><th>Reference</th><th></th></tr></thead>
+                            <tbody id="net-withdrawals-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-withdrawals-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-fraud">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-f-status"><option value="">Any status</option><option value="open">Open</option><option value="reviewing">Reviewing</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>User</th><th>Flag</th><th>Severity</th><th>Details</th><th>Status</th><th>Raised</th><th></th></tr></thead>
+                            <tbody id="net-fraud-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-fraud-pagination"></div>
+                    </div></div>
+                </div>
+            </section>
         </div>
     </main>
 </div>
@@ -1245,6 +1438,23 @@ if ($_SESSION['user_type'] !== 'admin') {
         document.getElementById('cg-filter-status').addEventListener('change', () => loadReferralsList(1));
         document.getElementById('cg-prev-page').addEventListener('click', () => loadReferralsList(Math.max(1, cgCurrentPage - 1)));
         document.getElementById('cg-next-page').addEventListener('click', () => loadReferralsList(cgCurrentPage + 1));
+        document.querySelectorAll('#net-subtabs .nav-link').forEach(link => link.addEventListener('click', e => { e.preventDefault(); switchNetworkSubtab(link.dataset.netsub); }));
+        const netSettingsForm = document.getElementById('net-settings-form');
+        if (netSettingsForm) netSettingsForm.addEventListener('submit', handleNetworkSettingsSubmit);
+        const netNewCampaignBtn = document.getElementById('net-new-campaign-btn');
+        if (netNewCampaignBtn) netNewCampaignBtn.addEventListener('click', createNetworkCampaign);
+        ['net-p-q', 'net-p-status'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id.endsWith('-q') ? 'input' : 'change', debounce(() => loadNetworkPartners(1), 300)); });
+        ['net-r-q', 'net-r-category', 'net-r-status'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id.endsWith('-q') ? 'input' : 'change', debounce(() => loadNetworkReferrals(1), 300)); });
+        const netRwStatus = document.getElementById('net-rw-status');
+        if (netRwStatus) netRwStatus.addEventListener('change', () => loadNetworkRewards(1));
+        const netWStatus = document.getElementById('net-w-status');
+        if (netWStatus) netWStatus.addEventListener('change', () => loadNetworkWithdrawals(1));
+        const netFStatus = document.getElementById('net-f-status');
+        if (netFStatus) netFStatus.addEventListener('change', () => loadNetworkFraud(1));
+        document.getElementById('net-p-export')?.addEventListener('click', exportNetworkPartnersCsv);
+        document.getElementById('net-r-export')?.addEventListener('click', exportNetworkReferralsCsv);
+        document.getElementById('net-rw-export')?.addEventListener('click', exportNetworkRewardsCsv);
+        document.getElementById('net-w-export')?.addEventListener('click', exportNetworkWithdrawalsCsv);
 
         // Part 1 — sidebar collapse (desktop) / off-canvas (mobile).
         const sidebarEl = document.getElementById('adminSidebar');
@@ -1262,7 +1472,7 @@ if ($_SESSION['user_type'] !== 'admin') {
     // Tabs that lazy-load their data the first time they're opened, rather
     // than on every 15s dashboard poll — none of this data changes as
     // often as the live dashboard/map does.
-    const TAB_LOADERS = { pricing: loadPricingCenter, 'driver-settings': loadDriverSettingsTab, 'regional-pricing': loadRegions, promotions: loadPromotions, commission: loadCommissionReport, 'driver-comms': loadDriverCommsTab, reports: () => loadReport('daily'), integrations: loadIntegrationCenter, notifications: loadNotificationCenter, diagnostics: loadDiagnostics, 'chat-monitoring': loadChatMonitoring, waitlist: loadWaitlistCenter, premium: loadPremiumCenter, 'community-growth': loadCommunityGrowthTab, 'ride-requests': loadRideRequestsCenter };
+    const TAB_LOADERS = { pricing: loadPricingCenter, 'driver-settings': loadDriverSettingsTab, 'regional-pricing': loadRegions, promotions: loadPromotions, commission: loadCommissionReport, 'driver-comms': loadDriverCommsTab, reports: () => loadReport('daily'), integrations: loadIntegrationCenter, notifications: loadNotificationCenter, diagnostics: loadDiagnostics, 'chat-monitoring': loadChatMonitoring, waitlist: loadWaitlistCenter, premium: loadPremiumCenter, 'community-growth': loadCommunityGrowthTab, 'ride-requests': loadRideRequestsCenter, 'mohtoh-network': loadNetworkTab };
     const loadedTabs = new Set();
     function switchTab(tabName) { document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active')); document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active')); document.getElementById(`tab-${tabName}`).classList.add('active'); document.querySelector(`.sidebar .nav-link[data-tab="${tabName}"]`).classList.add('active'); if (TAB_LOADERS[tabName] && !loadedTabs.has(tabName)) { loadedTabs.add(tabName); TAB_LOADERS[tabName](); } }
     // ---- Chat Monitoring (Task 5) — reuses toggleUserAccess()/sendAction() and #detailModal, no new admin page ----
@@ -1438,6 +1648,16 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
     async function sendAction(payload){ const res=await fetch('../api/admin-api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
     // ---- Shared helper: POST JSON to any endpoint (sendAction above is admin-api.php-specific) ----
     async function postJson(url, payload){ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
+    // ---- CSRF-protected POST, for api/network-admin.php only ----
+    // Same contract as postJson(), but every call carries the session's
+    // CSRF token (read from the <meta name="csrf-token"> tag this page
+    // renders via csrf_token()) as a `csrf_token` body field. Scoped to
+    // MOHTOH NETWORK's admin actions only — the generic postJson() above
+    // is left untouched so no other admin tab's request contract changes.
+    function csrfToken() { return document.querySelector('meta[name="csrf-token"]')?.content || ''; }
+    async function postJsonCsrf(url, payload) {
+        return postJson(url, { ...payload, csrf_token: csrfToken() });
+    }
     function showTabAlert(elId, res){ const el=document.getElementById(elId); if(!el) return; el.className='alert '+(res.status==='success'?'alert-success':'alert-danger'); el.textContent=res.message||(res.status==='success'?'Saved':'Failed'); el.classList.remove('d-none'); }
 
     // ---- Part 3: Universal Pagination — reusable renderer for every
@@ -2170,6 +2390,357 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
             if (res.status === 'success') loadPfRequests(pfRequestsPage); else alert(res.message);
         }
     });
+    // ---- MOHTOH NETWORK (admin tab, Phase 3) ----
+    function debounce(fn, delay) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; }
+    const netLoadedSubtabs = new Set();
+    function switchNetworkSubtab(name) {
+        document.querySelectorAll('#net-subtabs .nav-link').forEach(l => l.classList.remove('active'));
+        const navLink = document.querySelector(`#net-subtabs .nav-link[data-netsub="${name}"]`);
+        if (navLink) navLink.classList.add('active');
+        document.querySelectorAll('.net-subtab').forEach(el => el.classList.add('d-none'));
+        const pane = document.getElementById(`net-sub-${name}`);
+        if (pane) pane.classList.remove('d-none');
+        if (!netLoadedSubtabs.has(name) && NET_SUBTAB_LOADERS[name]) {
+            netLoadedSubtabs.add(name);
+            NET_SUBTAB_LOADERS[name]();
+        }
+    }
+    const NET_SUBTAB_LOADERS = {
+        overview: loadNetworkOverview, settings: loadNetworkSettings,
+        partners: () => loadNetworkPartners(1), referrals: () => loadNetworkReferrals(1),
+        rewards: () => loadNetworkRewards(1), withdrawals: () => loadNetworkWithdrawals(1), fraud: () => loadNetworkFraud(1),
+    };
+    async function loadNetworkTab() { await loadNetworkOverview(); netLoadedSubtabs.add('overview'); }
+    function netAlert(res) { showTabAlert('net-alert', res); }
+    // Client-side visibility only — the review branch does not carry the
+    // (unrelated) admin permission-catalog UI, so every admin who can reach
+    // this tab sees the management controls here. The real authorization
+    // boundary is server-side: every write action below still re-checks the
+    // specific permission (network.partners.manage / network.finance.manage)
+    // or require_super_admin() in api/network-admin.php.
+    function netCanManage(perm) { return true; }
+
+    async function loadNetworkOverview() {
+        const res = await fetch('../api/network-admin.php?action=overview');
+        const data = await res.json();
+        if (data.status !== 'success') return;
+        const { partners, referrals, rewards, withdrawals, open_fraud_flags } = data.data;
+        document.getElementById('net-ov-partners').textContent = partners.total_partners || 0;
+        document.getElementById('net-ov-pending').textContent = partners.pending_partners || 0;
+        document.getElementById('net-ov-active-referrals').textContent = referrals.active_referrals || 0;
+        document.getElementById('net-ov-converted').textContent = referrals.converted_referrals || 0;
+        document.getElementById('net-ov-fraud').textContent = open_fraud_flags || 0;
+        document.getElementById('net-ov-withdrawn').textContent = '₦' + Number(withdrawals.total_paid).toLocaleString();
+        document.getElementById('net-ov-generated').textContent = '₦' + Number(rewards.total_generated).toLocaleString();
+        document.getElementById('net-ov-rpending').textContent = '₦' + Number(rewards.total_pending).toLocaleString();
+        document.getElementById('net-ov-ravailable').textContent = '₦' + Number(rewards.total_available).toLocaleString();
+        document.getElementById('net-ov-rreversed').textContent = '₦' + Number(rewards.total_reversed).toLocaleString();
+        document.getElementById('net-ov-commission').textContent = '₦' + Number(rewards.referral_generated_commission).toLocaleString();
+        document.getElementById('net-ov-generated2').textContent = '₦' + Number(rewards.total_generated).toLocaleString();
+        document.getElementById('net-ov-net').textContent = '₦' + Number(rewards.referral_generated_commission - rewards.total_generated).toLocaleString();
+    }
+
+    // Settings — one flat map of <input id> -> system_settings key, same
+    // shape the Community Growth form above uses, just larger.
+    const NET_SETTING_FIELDS = {
+        'net-enabled': 'network_enabled', 'net-registrations-enabled': 'network_registrations_enabled',
+        'net-links-enabled': 'network_links_enabled', 'net-rewards-enabled': 'network_rewards_enabled',
+        'net-withdrawals-enabled': 'network_withdrawals_enabled', 'net-driver-referrals-enabled': 'network_driver_referrals_enabled',
+        'net-passenger-referrals-enabled': 'network_passenger_referrals_enabled', 'net-external-partners-enabled': 'network_external_partners_enabled',
+        'net-maintenance-mode': 'network_maintenance_mode', 'net-emergency-payout-suspended': 'network_emergency_payout_suspended',
+        'net-partner-auto-approve': 'network_partner_auto_approve', 'net-launch-at': 'network_launch_at', 'net-closes-at': 'network_closes_at',
+        'net-driver-reward-pct': 'network_driver_reward_pct', 'net-passenger-reward-pct': 'network_passenger_reward_pct',
+        'net-combined-ceiling-pct': 'network_combined_ceiling_pct', 'net-earning-days': 'network_earning_days',
+        'net-min-withdrawal': 'network_min_withdrawal', 'net-registration-bonus': 'network_registration_bonus',
+        'net-reward-hold-days': 'network_reward_hold_days', 'net-total-budget': 'network_total_budget',
+        'net-daily-budget': 'network_daily_budget', 'net-monthly-budget': 'network_monthly_budget',
+        'net-max-combined-payout-per-txn': 'network_max_combined_payout_per_txn', 'net-max-withdrawal-per-day': 'network_max_withdrawal_per_day',
+        'net-max-withdrawal-per-month': 'network_max_withdrawal_per_month',
+        'net-fraud-velocity-max': 'network_fraud_velocity_max_per_day', 'net-fraud-same-pair-max': 'network_fraud_same_pair_max_rewards',
+        'net-announcement': 'network_announcement',
+        'net-terms-version': 'network_terms_version', 'net-terms-text': 'network_terms_text',
+    };
+    async function loadNetworkSettings() {
+        const res = await fetch('../api/network-admin.php?action=settings');
+        const data = await res.json();
+        if (data.status !== 'success') return;
+        const s = data.data.settings;
+        Object.entries(NET_SETTING_FIELDS).forEach(([elId, key]) => { const el = document.getElementById(elId); if (el) el.value = s[key] ?? ''; });
+        await loadNetworkCampaigns();
+    }
+    async function handleNetworkSettingsSubmit(e) {
+        e.preventDefault();
+        const settings = {};
+        Object.entries(NET_SETTING_FIELDS).forEach(([elId, key]) => { const el = document.getElementById(elId); if (el) settings[key] = el.value; });
+        const res = await postJsonCsrf('../api/network-admin.php?action=update_settings', { settings });
+        netAlert(res);
+    }
+    async function loadNetworkCampaigns() {
+        const res = await fetch('../api/network-admin.php?action=campaigns');
+        const data = await res.json();
+        const body = document.getElementById('net-campaigns-body');
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const campaigns = data.data.campaigns || [];
+        body.innerHTML = campaigns.length ? campaigns.map(c => `<tr>
+            <td>${escapeHtml(c.name)}</td><td>${c.driver_reward_pct ?? '—'}</td><td>${c.passenger_reward_pct ?? '—'}</td><td>${c.combined_ceiling_pct ?? '—'}</td>
+            <td class="small">${c.starts_at ? new Date(c.starts_at).toLocaleDateString() : '—'} → ${c.ends_at ? new Date(c.ends_at).toLocaleDateString() : '—'}</td>
+            <td><span class="badge ${c.status === 'active' ? 'bg-success' : (['ended', 'cancelled'].includes(c.status) ? 'bg-secondary' : 'bg-info')}">${escapeHtml(c.status)}</span></td>
+            <td>${!['ended', 'cancelled'].includes(c.status) ? `<button class="btn btn-sm btn-outline-danger" onclick="endNetworkCampaign(${c.id})">End</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No campaigns yet.</td></tr>';
+    }
+    async function createNetworkCampaign() {
+        const name = prompt('Campaign name:');
+        if (!name) return;
+        const driverPct = prompt('Driver reward % for this campaign (blank = use the default setting):', '') || '';
+        const passengerPct = prompt('Passenger reward % for this campaign (blank = use the default setting):', '') || '';
+        const startsAt = prompt('Start (YYYY-MM-DD HH:MM):');
+        const endsAt = prompt('End (YYYY-MM-DD HH:MM):');
+        if (!startsAt || !endsAt) { alert('Start and end are required.'); return; }
+        const res = await postJsonCsrf('../api/network-admin.php?action=create_campaign', { name, driver_reward_pct: driverPct, passenger_reward_pct: passengerPct, starts_at: startsAt, ends_at: endsAt });
+        if (res.status === 'success') loadNetworkCampaigns(); else alert(res.message || 'Failed to create campaign');
+    }
+    async function endNetworkCampaign(id) {
+        if (!confirm('End this campaign now?')) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=end_campaign', { campaign_id: id });
+        if (res.status === 'success') loadNetworkCampaigns(); else alert(res.message || 'Failed to end campaign');
+    }
+
+    // Partners
+    const NET_PARTNER_BADGE = { pending: 'bg-warning text-dark', approved: 'bg-success', suspended: 'bg-danger', rejected: 'bg-secondary' };
+    function netPartnerActionButtons(p) {
+        if (p.status === 'pending') return `<button class="btn btn-sm btn-outline-success mb-1" onclick="approveNetworkPartner(${p.id})">Approve</button>`;
+        if (p.status === 'approved') return `<button class="btn btn-sm btn-outline-danger mb-1" onclick="suspendNetworkPartner(${p.id})">Suspend</button>`;
+        if (p.status === 'suspended') return `<button class="btn btn-sm btn-outline-success mb-1" onclick="reactivateNetworkPartner(${p.id})">Reactivate</button>`;
+        return '';
+    }
+    async function loadNetworkPartners(page) {
+        const params = new URLSearchParams({ action: 'partners', page, limit: 20 });
+        const q = document.getElementById('net-p-q').value.trim();
+        const status = document.getElementById('net-p-status').value;
+        if (q) params.set('q', q);
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-partners-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const partners = data.data.partners || [];
+        const canManage = netCanManage('network.partners.manage');
+        body.innerHTML = partners.length ? partners.map(p => `<tr>
+            <td>${escapeHtml(p.fullname)} <span class="text-muted small">${escapeHtml(p.public_user_id || '')}</span><br><span class="text-muted small text-capitalize">${escapeHtml(p.user_type)}</span></td>
+            <td><code>${escapeHtml(p.referral_code)}</code></td>
+            <td><span class="badge ${NET_PARTNER_BADGE[p.status] || 'bg-secondary'}">${escapeHtml(p.status)}</span>${p.status === 'suspended' && p.suspension_reason ? `<div class="small text-muted">${escapeHtml(p.suspension_reason)}</div>` : ''}</td>
+            <td>${p.total_referrals}</td>
+            <td>₦${Number(p.lifetime_rewards).toLocaleString()}</td>
+            <td class="small text-muted">${p.joined_at ? new Date(p.joined_at).toLocaleDateString() : ''}</td>
+            <td>${canManage ? netPartnerActionButtons(p) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No partners match these filters.</td></tr>';
+        renderPagination('net-partners-pagination', data.pagination, loadNetworkPartners);
+    }
+    async function approveNetworkPartner(id) { const res = await postJsonCsrf('../api/network-admin.php?action=approve_partner', { partner_id: id }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+    async function suspendNetworkPartner(id) { const reason = prompt('Reason for suspension (required, shown to the partner):'); if (!reason) return; const res = await postJsonCsrf('../api/network-admin.php?action=suspend_partner', { partner_id: id, reason }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+    async function reactivateNetworkPartner(id) { const res = await postJsonCsrf('../api/network-admin.php?action=reactivate_partner', { partner_id: id }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+
+    // Referrals
+    const NET_REFERRAL_BADGE = { registered: 'bg-secondary', verified: 'bg-info', active: 'bg-success', expired: 'bg-dark', cancelled: 'bg-danger', legacy_migrated: 'bg-light text-dark' };
+    async function loadNetworkReferrals(page) {
+        const params = new URLSearchParams({ action: 'referrals', page, limit: 20 });
+        const q = document.getElementById('net-r-q').value.trim();
+        const category = document.getElementById('net-r-category').value;
+        const status = document.getElementById('net-r-status').value;
+        if (q) params.set('q', q);
+        if (category) params.set('category', category);
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-referrals-body');
+        body.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const referrals = data.data.referrals || [];
+        const canManage = netCanManage('network.partners.manage');
+        body.innerHTML = referrals.length ? referrals.map(r => `<tr>
+            <td>${escapeHtml(r.referrer_name)} <span class="text-muted small">${escapeHtml(r.referrer_public_id || '')}</span></td>
+            <td>${escapeHtml(r.referred_name)} <span class="text-muted small">${escapeHtml(r.referred_public_id || '')}</span></td>
+            <td class="text-capitalize">${escapeHtml(r.referred_category)}</td>
+            <td><span class="badge ${NET_REFERRAL_BADGE[r.status] || 'bg-secondary'}">${escapeHtml(r.status.replace('_', ' '))}</span></td>
+            <td class="small">${r.earning_starts_at ? (new Date(r.earning_starts_at).toLocaleDateString() + ' → ' + new Date(r.earning_expires_at).toLocaleDateString()) : '—'}</td>
+            <td>${r.qualifying_ride_count}</td>
+            <td>₦${Number(r.total_rewards_generated).toLocaleString()}</td>
+            <td>${canManage && !r.attribution_locked_at ? `<button class="btn btn-sm btn-outline-secondary mb-1" onclick="correctNetworkAttribution(${r.id})">Reassign</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No referrals match these filters.</td></tr>';
+        renderPagination('net-referrals-pagination', data.pagination, loadNetworkReferrals);
+    }
+    async function correctNetworkAttribution(referralId) {
+        const newReferrerUserId = prompt('New referrer — their internal user ID (see the Partners/Passengers/Drivers tabs):');
+        if (!newReferrerUserId) return;
+        const reason = prompt('Reason for this correction (required, audited):');
+        if (!reason) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=correct_attribution', { network_referral_id: referralId, new_referrer_user_id: newReferrerUserId, reason });
+        if (res.status === 'success') loadNetworkReferrals(1); else alert(res.message || 'Failed');
+    }
+
+    // Rewards
+    const NET_REWARD_BADGE = { pending: 'bg-warning text-dark', available: 'bg-success', withdrawn: 'bg-primary', reversed: 'bg-danger', suspended: 'bg-secondary' };
+    async function loadNetworkRewards(page) {
+        const params = new URLSearchParams({ action: 'reward_ledger', page, limit: 20 });
+        const status = document.getElementById('net-rw-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-rewards-body');
+        body.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.ledger || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(r => `<tr>
+            <td>${escapeHtml(r.beneficiary_name)} <span class="text-muted small">${escapeHtml(r.beneficiary_public_id || '')}</span></td>
+            <td class="small">${r.beneficiary_role === 'driver_referrer' ? 'Driver referrer' : 'Passenger referrer'}</td>
+            <td>₦${Number(r.commission_base).toLocaleString()}</td>
+            <td>${r.reward_pct}%</td>
+            <td>₦${Number(r.reward_amount).toLocaleString()}</td>
+            <td><span class="badge ${NET_REWARD_BADGE[r.status] || 'bg-secondary'}">${escapeHtml(r.status)}</span>${r.reversal_reason ? `<div class="small text-muted">${escapeHtml(r.reversal_reason)}</div>` : ''}</td>
+            <td class="small text-muted">${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
+            <td>${canManage && !['reversed', 'withdrawn'].includes(r.status) ? `<button class="btn btn-sm btn-outline-danger mb-1" onclick="reverseNetworkReward(${r.id})">Reverse</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No rewards match these filters.</td></tr>';
+        renderPagination('net-rewards-pagination', data.pagination, loadNetworkRewards);
+    }
+    async function reverseNetworkReward(ledgerId) {
+        const reason = prompt('Reason for reversing this reward (required, audited):');
+        if (!reason) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=reverse_reward', { ledger_id: ledgerId, reason });
+        if (res.status === 'success') loadNetworkRewards(1); else alert(res.message || 'Failed');
+    }
+
+    // Withdrawals
+    const NET_WITHDRAWAL_BADGE = { pending: 'bg-warning text-dark', under_review: 'bg-info', approved: 'bg-info', processing: 'bg-info', paid: 'bg-success', rejected: 'bg-danger', failed: 'bg-danger', reversed: 'bg-secondary' };
+    function netWithdrawalActionButtons(w) {
+        if (['pending', 'under_review'].includes(w.status)) {
+            return `<button class="btn btn-sm btn-outline-success me-1 mb-1" onclick="decideNetworkWithdrawal(${w.id},'approve')">Approve</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'reject')">Reject</button>`;
+        }
+        if (['approved', 'processing'].includes(w.status)) {
+            return `<button class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="decideNetworkWithdrawal(${w.id},'paid')">Mark Paid</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'failed')">Mark Failed</button>`;
+        }
+        return '';
+    }
+    async function loadNetworkWithdrawals(page) {
+        const params = new URLSearchParams({ action: 'withdrawals', page, limit: 20 });
+        const status = document.getElementById('net-w-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-withdrawals-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.withdrawals || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(w => `<tr>
+            <td>${escapeHtml(w.user_name)} <span class="text-muted small">${escapeHtml(w.public_user_id || '')}</span></td>
+            <td>₦${Number(w.amount).toLocaleString()}</td>
+            <td class="small">${escapeHtml(w.bank_name)} ••${escapeHtml(w.account_number_last4)}<br>${escapeHtml(w.account_name)}</td>
+            <td><span class="badge ${NET_WITHDRAWAL_BADGE[w.status] || 'bg-secondary'}">${escapeHtml(w.status.replace('_', ' '))}</span></td>
+            <td class="small text-muted">${w.requested_at ? new Date(w.requested_at).toLocaleString() : ''}</td>
+            <td class="small">${escapeHtml(w.payment_reference || w.rejection_reason || '—')}</td>
+            <td>${canManage ? netWithdrawalActionButtons(w) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No withdrawals match these filters.</td></tr>';
+        renderPagination('net-withdrawals-pagination', data.pagination, loadNetworkWithdrawals);
+    }
+    async function decideNetworkWithdrawal(id, decision) {
+        let note = null;
+        if (decision === 'paid') { note = prompt('Payment reference (required — proof the transfer was made):'); if (!note) return; }
+        else if (decision === 'reject' || decision === 'failed') { note = prompt('Reason (required, audited):'); if (!note) return; }
+        const res = await postJsonCsrf('../api/network-admin.php?action=decide_withdrawal', { withdrawal_id: id, decision, note });
+        if (res.status === 'success') loadNetworkWithdrawals(1); else alert(res.message || 'Failed');
+    }
+
+    // Fraud
+    const NET_FRAUD_BADGE = { open: 'bg-danger', reviewing: 'bg-warning text-dark', resolved: 'bg-success', dismissed: 'bg-secondary' };
+    function netFraudActionButtons(id) {
+        return `<button class="btn btn-sm btn-outline-success me-1 mb-1" onclick="resolveNetworkFraudFlag(${id},'resolved')">Resolve</button><button class="btn btn-sm btn-outline-secondary mb-1" onclick="resolveNetworkFraudFlag(${id},'dismissed')">Dismiss</button>`;
+    }
+    async function loadNetworkFraud(page) {
+        const params = new URLSearchParams({ action: 'fraud_flags', page, limit: 20 });
+        const status = document.getElementById('net-f-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-fraud-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.flags || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(f => `<tr>
+            <td>${escapeHtml(f.user_name)} <span class="text-muted small">${escapeHtml(f.public_user_id || '')}</span></td>
+            <td class="small text-capitalize">${escapeHtml((f.flag_type || '').replace(/_/g, ' '))}</td>
+            <td><span class="badge bg-${f.severity === 'high' ? 'danger' : (f.severity === 'medium' ? 'warning text-dark' : 'secondary')}">${escapeHtml(f.severity)}</span></td>
+            <td class="small">${escapeHtml(f.details || '—')}</td>
+            <td><span class="badge ${NET_FRAUD_BADGE[f.status] || 'bg-secondary'}">${escapeHtml(f.status)}</span>${f.resolution_notes ? `<div class="small text-muted">${escapeHtml(f.resolution_notes)}</div>` : ''}</td>
+            <td class="small text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString() : ''}</td>
+            <td>${canManage && ['open', 'reviewing'].includes(f.status) ? netFraudActionButtons(f.id) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No fraud flags.</td></tr>';
+        renderPagination('net-fraud-pagination', data.pagination, loadNetworkFraud);
+    }
+    async function resolveNetworkFraudFlag(id, status) {
+        const notes = prompt('Resolution notes:') || '';
+        const res = await postJsonCsrf('../api/network-admin.php?action=resolve_fraud_flag', { flag_id: id, status, notes });
+        if (res.status === 'success') loadNetworkFraud(1); else alert(res.message || 'Failed');
+    }
+
+    // ---- CSV export (spec 13: "downloadable reports") — generic,
+    // reused across every Network list rather than one-off per table.
+    function downloadCsv(filename, headers, rows) {
+        // CSV/formula-injection guard (OWASP): a cell whose value starts
+        // with =, +, -, @ (or a tab/CR) is interpreted as a formula by
+        // Excel/Sheets when the file is opened — a malicious bank name,
+        // account name, or partner fullname could otherwise execute code
+        // or exfiltrate data on whoever opens the export. Prefixing with
+        // a single quote forces text interpretation without changing the
+        // visible value for any legitimate (non-formula-looking) input.
+        const neutralizeFormula = (v) => /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+        const esc = (v) => '"' + neutralizeFormula(String(v ?? '')).replace(/"/g, '""') + '"';
+        const csv = [headers.map(esc).join(',')].concat(rows.map(r => r.map(esc).join(','))).join('\r\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+    async function exportNetworkPartnersCsv() {
+        const params = new URLSearchParams({ action: 'partners', page: 1, limit: 1000 });
+        const q = document.getElementById('net-p-q').value.trim(); if (q) params.set('q', q);
+        const status = document.getElementById('net-p-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-partners.csv', ['Name', 'Public ID', 'Type', 'Code', 'Status', 'Total Referrals', 'Lifetime Rewards', 'Joined'],
+            (data.data.partners || []).map(p => [p.fullname, p.public_user_id, p.user_type, p.referral_code, p.status, p.total_referrals, p.lifetime_rewards, p.joined_at]));
+    }
+    async function exportNetworkReferralsCsv() {
+        const params = new URLSearchParams({ action: 'referrals', page: 1, limit: 1000 });
+        const q = document.getElementById('net-r-q').value.trim(); if (q) params.set('q', q);
+        const category = document.getElementById('net-r-category').value; if (category) params.set('category', category);
+        const status = document.getElementById('net-r-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-referrals.csv', ['Referrer', 'Referred', 'Category', 'Status', 'Registered', 'Earning Starts', 'Earning Expires', 'Qualifying Rides', 'Commission Generated', 'Rewards Generated'],
+            (data.data.referrals || []).map(r => [r.referrer_name, r.referred_name, r.referred_category, r.status, r.registered_at, r.earning_starts_at, r.earning_expires_at, r.qualifying_ride_count, r.total_commission_generated, r.total_rewards_generated]));
+    }
+    async function exportNetworkRewardsCsv() {
+        const params = new URLSearchParams({ action: 'reward_ledger', page: 1, limit: 1000 });
+        const status = document.getElementById('net-rw-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-rewards.csv', ['Beneficiary', 'Role', 'Commission Base', 'Pct', 'Reward Amount', 'Status', 'Created'],
+            (data.data.ledger || []).map(r => [r.beneficiary_name, r.beneficiary_role, r.commission_base, r.reward_pct, r.reward_amount, r.status, r.created_at]));
+    }
+    async function exportNetworkWithdrawalsCsv() {
+        const params = new URLSearchParams({ action: 'withdrawals', page: 1, limit: 1000 });
+        const status = document.getElementById('net-w-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-withdrawals.csv', ['Partner', 'Amount', 'Bank', 'Account Last4', 'Status', 'Requested', 'Reference'],
+            (data.data.withdrawals || []).map(w => [w.user_name, w.amount, w.bank_name, w.account_number_last4, w.status, w.requested_at, w.payment_reference]));
+    }
+
     async function logout(){ const formData=new FormData(); formData.append('action','logout'); const res=await fetch('../api/auth.php',{method:'POST',body:formData}); const data=await res.json(); if(data.status==='success') window.location.href=data.data.redirect||'../index.php'; }
     function escapeHtml(value){ return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 </script>

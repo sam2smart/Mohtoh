@@ -165,16 +165,14 @@ if ($action === 'register') {
             send_phone_otp($pdo, $user_id);
         }
 
-        // MohToh Community Rewards — link the relationship if a valid,
-        // non-self-referential code was supplied. Never blocks or fails
-        // registration itself; create_referral_relationship() returns an
+        // MOHTOH NETWORK — link the relationship if a valid, approved
+        // Network Partner code was supplied. Never blocks or fails
+        // registration itself; network_attribute_referral() returns an
         // ['error'=>...] array rather than throwing for any invalid case.
         if ($referral_code !== '') {
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ?");
-            $stmt->execute([$referral_code]);
-            $referrerId = $stmt->fetchColumn();
-            if ($referrerId) {
-                create_referral_relationship($pdo, (int)$referrerId, (int)$user_id, strtoupper($user_type));
+            $partner = get_network_partner_by_code($pdo, $referral_code);
+            if ($partner && $partner['status'] === 'approved') {
+                network_attribute_referral($pdo, (int)$partner['user_id'], (int)$user_id, $user_type);
             }
         }
 

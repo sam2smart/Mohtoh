@@ -829,6 +829,18 @@ try {
             $stmt->execute([$payment['id']]);
 
             $pdo->commit();
+
+            // MOHTOH NETWORK: a direct-paid booking only becomes a
+            // qualifying transaction once BOTH the trip is completed
+            // AND the driver confirms the cash arrived — this is that
+            // second condition finally being met. Idempotent; never
+            // allowed to affect the payment confirmation above.
+            try {
+                network_settle_booking_reward($pdo, $booking_id);
+            } catch (Throwable $e) {
+                error_log('MOHTOH NETWORK settlement failed for booking #' . $booking_id . ': ' . $e->getMessage());
+            }
+
             json_response('success', 'Direct payment confirmed and commission settled.');
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
