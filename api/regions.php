@@ -12,9 +12,11 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: reading regional pricing needs pricing.view; the money-
+// affecting writes below keep their own require_super_admin($pdo) gate, so a
+// pricing.view Subadmin can see regions but never change price/commission.
+require_admin_permission($pdo, 'pricing.view');
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $stmt = $pdo->query("SELECT id, public_id, name, center_lat, center_lng, radius_km, price_per_km, base_fare, commission_percentage, is_active, created_at FROM regions ORDER BY name ASC");

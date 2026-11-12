@@ -51,6 +51,7 @@ try {
                 'destination_lat'   => $input['destination_lat'] ?? '',
                 'destination_lng'   => $input['destination_lng'] ?? '',
                 'notes'             => $input['notes'] ?? '',
+                'vehicle_type'      => $input['vehicle_type'] ?? '',
             ]);
             json_response($result['status'], $result['message'], $result['data'] ?? []);
             break;
@@ -103,6 +104,36 @@ try {
             json_response($result['status'], $result['message'], $result['data'] ?? []);
             break;
 
+        // Passenger consents to (accept) or rejects a driver's proposed fare
+        // (criterion #3). Accepting makes the proposed fare authoritative and
+        // spawns the trip; rejecting reopens the request without corrupting
+        // the fare. Backend validates ownership and that a proposal exists.
+        case 'accept_fare':
+            if ($user_type !== 'rider') {
+                json_response('error', 'Only riders can confirm a fare.');
+            }
+            $result = respond_to_pickup_proposal($pdo, $user_id, (string)($input['request_public_id'] ?? ''), true);
+            json_response($result['status'], $result['message'], $result['data'] ?? []);
+            break;
+
+        case 'reject_fare':
+            if ($user_type !== 'rider') {
+                json_response('error', 'Only riders can decline a fare.');
+            }
+            $result = respond_to_pickup_proposal($pdo, $user_id, (string)($input['request_public_id'] ?? ''), false);
+            json_response($result['status'], $result['message'], $result['data'] ?? []);
+            break;
+
+        // Passenger confirms the driver has physically arrived (criterion #11).
+        // This is the fact the hard start-trip gate (criterion #12) requires.
+        case 'confirm_arrival':
+            if ($user_type !== 'rider') {
+                json_response('error', 'Only riders can confirm the driver has arrived.');
+            }
+            $result = confirm_private_pickup_arrival($pdo, $user_id, (string)($input['request_public_id'] ?? ''));
+            json_response($result['status'], $result['message'], $result['data'] ?? []);
+            break;
+
         // ---------------- DRIVER ----------------
         case 'feed':
             if ($user_type !== 'driver') {
@@ -117,6 +148,30 @@ try {
                 json_response('error', 'Only drivers can accept a pickup request.');
             }
             $result = accept_private_pickup_request($pdo, $user_id, (string)($input['request_public_id'] ?? ''));
+            json_response($result['status'], $result['message'], $result['data'] ?? []);
+            break;
+
+        // Driver proposes a fare (a keke's repositioning-inclusive price, or a
+        // custom amount). Never final on its own - it becomes a proposal the
+        // passenger must confirm (criteria #3/#4). Optional 'amount'; when
+        // omitted the driver's own computed fare is proposed.
+        case 'propose':
+            if ($user_type !== 'driver') {
+                json_response('error', 'Only drivers can propose a fare.');
+            }
+            $amount = ($input['amount'] ?? '') !== '' ? (float)$input['amount'] : null;
+            $result = propose_private_pickup_fare($pdo, $user_id, (string)($input['request_public_id'] ?? ''), $amount);
+            json_response($result['status'], $result['message'], $result['data'] ?? []);
+            break;
+
+        // Driver marks arrival at the pickup point (criterion #11). Moves the
+        // private trip to PASSENGERS_ASSEMBLED and notifies the passenger; it
+        // does NOT start the trip.
+        case 'arrived':
+            if ($user_type !== 'driver') {
+                json_response('error', 'Only drivers can mark arrival.');
+            }
+            $result = mark_private_pickup_arrived($pdo, $user_id, (int)($input['ride_id'] ?? 0));
             json_response($result['status'], $result['message'], $result['data'] ?? []);
             break;
 

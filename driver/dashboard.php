@@ -31,6 +31,8 @@ $isOnline = $currentUser['is_online'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK join/withdrawal requests). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh Driver — Home</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -51,6 +53,7 @@ $isOnline = $currentUser['is_online'];
     <link rel="stylesheet" href="../assets/css/utilities.css">
     <link rel="stylesheet" href="../assets/css/animations.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
+    <link rel="stylesheet" href="../assets/css/image-viewer.css">
 </head>
 <body>
 
@@ -139,14 +142,14 @@ $isOnline = $currentUser['is_online'];
             </section>
 
             <!-- ================= Premium teaser (Part 2) ================= -->
-            <a href="profile.php?open=premium" class="card u-flex u-items-center u-gap-3 anim-slide-up" id="premiumTeaserCard" style="padding:var(--space-4);color:inherit;text-decoration:none;">
+            <!-- <a href="profile.php?open=premium" class="card u-flex u-items-center u-gap-3 anim-slide-up" id="premiumTeaserCard" style="padding:var(--space-4);color:inherit;text-decoration:none;">
                 <i class="bi bi-award" style="font-size:1.4rem;color:var(--color-accent-600);"></i>
                 <div style="flex:1;min-width:0;">
                     <div class="u-text-xs u-text-faint" id="premiumTeaserPlan">Basic Plan</div>
                     <div style="font-weight:700;" id="premiumTeaserText">Upgrade to Premium</div>
                 </div>
                 <i class="bi bi-chevron-right u-text-faint"></i>
-            </a>
+            </a> -->
 
             <!-- ================= Current ride strip ================= -->
             <section class="card" id="currentRideCard" style="padding:var(--space-4);"></section>
@@ -170,7 +173,7 @@ $isOnline = $currentUser['is_online'];
 
     <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
     <?php include __DIR__ . '/../partials/messages-sheet.php'; ?>
-    <?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+    <?php include __DIR__ . '/../partials/network-sheet.php'; ?>
 
     <!-- ================= Upcoming rides sheet ================= -->
     <div class="sheet" id="upcomingRidesSheet" role="dialog" aria-modal="true">
@@ -385,12 +388,14 @@ $isOnline = $currentUser['is_online'];
 
             <div class="field-group">
                 <label class="field-label" for="createRidePickup">Pickup</label>
-                <div class="field"><i class="bi bi-record-circle" style="color:var(--color-primary);"></i><input type="text" id="createRidePickup" name="pickup_location" placeholder="Pickup location" required></div>
+                <div class="field"><i class="bi bi-record-circle" style="color:var(--color-primary);"></i><input type="text" id="createRidePickup" name="pickup_location" placeholder="Type and select a suggestion" required></div>
+                <p class="u-text-xs u-text-faint" style="margin-top:4px;margin-bottom:0;"><i class="bi bi-info-circle"></i> Select a suggestion from the list — required for pricing</p>
                 <button type="button" class="btn-text u-text-xs u-hidden u-mt-2" id="suggestPickupBtn">+ Suggest this as a MohToh location</button>
             </div>
             <div class="field-group">
                 <label class="field-label" for="createRideDestination">Destination</label>
-                <div class="field"><i class="bi bi-geo-alt-fill" style="color:var(--color-danger);"></i><input type="text" id="createRideDestination" name="destination" placeholder="Destination" required></div>
+                <div class="field"><i class="bi bi-geo-alt-fill" style="color:var(--color-danger);"></i><input type="text" id="createRideDestination" name="destination" placeholder="Type and select a suggestion" required></div>
+                <p class="u-text-xs u-text-faint" style="margin-top:4px;margin-bottom:0;"><i class="bi bi-info-circle"></i> Select a suggestion from the list — required for pricing</p>
                 <button type="button" class="btn-text u-text-xs u-hidden u-mt-2" id="suggestDestinationBtn">+ Suggest this as a MohToh location</button>
             </div>
             <div class="search-card__row">
@@ -530,6 +535,7 @@ $isOnline = $currentUser['is_online'];
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="../assets/js/helper.js"></script>
+<script src="../assets/js/image-viewer.js"></script>
 <script src="../assets/js/api-client.js"></script>
 <script src="../assets/js/state.js"></script>
 <script src="../assets/js/sound-manager.js"></script>
@@ -538,7 +544,7 @@ $isOnline = $currentUser['is_online'];
 <script src="../assets/js/navigation.js"></script>
 <script src="../assets/js/map.js"></script>
 <script src="../assets/js/messages.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script src="../assets/js/driver.js"></script>
 <script src="../assets/js/driver-ride-creation.js"></script>
 </body>

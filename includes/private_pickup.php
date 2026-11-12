@@ -26,7 +26,7 @@ require_once __DIR__ . '/eligibility.php';
 /**
  * Rider creates a private pickup request.
  * $data keys: pickup_location, pickup_lat, pickup_lng, destination,
- *             destination_lat, destination_lng, notes.
+ *             destination_lat, destination_lng, notes, vehicle_type.
  * Returns ['status','message','data'].
  */
 function create_private_pickup_request(PDO $pdo, int $riderId, array $data): array {
@@ -42,6 +42,18 @@ function create_private_pickup_request(PDO $pdo, int $riderId, array $data): arr
     $dest_lat    = ($data['destination_lat'] ?? '') !== '' ? (float)$data['destination_lat'] : null;
     $dest_lng    = ($data['destination_lng'] ?? '') !== '' ? (float)$data['destination_lng'] : null;
     $notes       = trim((string)($data['notes'] ?? ''));
+
+    // Passenger's vehicle-class choice (criterion #5). Private Pickup is a
+    // whole-vehicle trip that a keke and a private car price and match
+    // differently, so the passenger must pick which they want and the
+    // request is stamped with it. Canonicalised so "Keke Napep"/"Saloon"
+    // resolve to the stored class, then validated server-side against the
+    // classes Private Pickup actually serves - the client is never trusted
+    // to send a legal value.
+    $vehicle_type = normalize_vehicle_type($data['vehicle_type'] ?? '');
+    if (!is_private_pickup_vehicle_type($vehicle_type)) {
+        return ['status' => 'error', 'message' => 'Please choose Private Car or Private Keke for your pickup.'];
+    }
 
     if ($pickup_location === '' || $destination === '') {
         return ['status' => 'error', 'message' => 'Pickup and destination are required.'];
@@ -64,14 +76,15 @@ function create_private_pickup_request(PDO $pdo, int $riderId, array $data): arr
     }
 
     $distance_km = calculate_distance_km($pickup_lat, $pickup_lng, $dest_lat, $dest_lng);
-    // No driver is matched yet, so no vehicle class is known. The request is
-    // stamped with the keke rate - Private Pickup's default class, and the
-    // figure the rider is quoted while searching - and RE-PRICED against the
-    // accepting driver's actual vehicle class in spawn_private_ride_from_request().
-    // What the rider is finally charged always comes from the class that runs
-    // the trip, never from this placeholder.
-    $fare = estimate_private_pickup_fare($pdo, $distance_km, 'keke');
-    $fare_options = private_pickup_fare_options($pdo, $distance_km);
+    // Priced at the CHOSEN class over the trip distance (pickup -> destination).
+    // This is the passenger's authoritative opening fare - the single number
+    // shown to both sides while searching (criterion #2). For a car this is the
+    // final fare (car pricing is trip-only, criterion #9). For a keke it is a
+    // preliminary figure: the keke's run to the pickup point (criterion #7)
+    // cannot be known until a specific keke is matched, so the matched driver's
+    // repositioning-inclusive fare goes back to the passenger for consent
+    // (criterion #3) rather than silently overwriting this number.
+    $fare = estimate_private_pickup_fare($pdo, $distance_km, $vehicle_type);
     $ttl  = (int) get_system_setting($pdo, 'private_pickup_request_ttl_seconds', 90);
 
     $public_id = generate_unique_public_id($pdo, 'ride_requests', 'public_id', 'REQ');
@@ -79,26 +92,27 @@ function create_private_pickup_request(PDO $pdo, int $riderId, array $data): arr
         "INSERT INTO ride_requests
             (public_id, rider_id, request_type, pickup_lat, pickup_lng, pickup_location,
              destination, destination_lat, destination_lng, notes,
-             requested_service_category, price, platform_fee, status, expires_at)
-         VALUES (?, ?, 'private_pickup', ?, ?, ?, ?, ?, ?, ?, 'Standard', ?, ?, 'pending',
+             requested_service_category, requested_vehicle_type, price, platform_fee, status, expires_at)
+         VALUES (?, ?, 'private_pickup', ?, ?, ?, ?, ?, ?, ?, 'Standard', ?, ?, ?, 'pending',
                  DATE_ADD(NOW(), INTERVAL ? SECOND))"
     );
     $platform_fee = round($fare['platform_fee'], 2);
     $stmt->execute([
         $public_id, $riderId, $pickup_lat, $pickup_lng, $pickup_location,
         $destination, $dest_lat, $dest_lng, ($notes !== '' ? $notes : null),
-        round($fare['total'], 2), $platform_fee, $ttl,
+        $vehicle_type, round($fare['total'], 2), $platform_fee, $ttl,
     ]);
     $requestId = (int)$pdo->lastInsertId();
 
-    // Fan out to nearby eligible drivers as notifications (with a beep hint
-    // in meta the client sound-manager can act on).
+    // Fan out to nearby eligible drivers OF THE CHOSEN CLASS as notifications
+    // (with a beep hint in meta the client sound-manager can act on).
     $matched = notify_nearby_drivers_of_request($pdo, $requestId);
 
     return ['status' => 'success', 'message' => 'Looking for a nearby driver...', 'data' => [
         'request_public_id' => $public_id,
+        'vehicle_type'      => $vehicle_type,
+        'vehicle_type_label'=> vehicle_type_label($vehicle_type),
         'estimated_fare'    => round($fare['total'], 2),
-        'fare_options'      => private_pickup_public_fare_options($fare_options),
         'distance_km'       => $distance_km,
         'expires_in_seconds'=> $ttl,
         'drivers_notified'  => $matched,
@@ -249,32 +263,29 @@ function notify_nearby_drivers_of_request(PDO $pdo, int $requestId): int {
         return 0;
     }
 
-    $drivers = find_nearby_pickup_drivers($pdo, (float)$req['pickup_lat'], (float)$req['pickup_lng']);
+    // Only drivers of the class the passenger chose are alerted (criterion #5):
+    // a car request never rings a keke driver and vice versa. The class filter
+    // is applied in SQL by find_nearby_pickup_drivers(), so this is enforced at
+    // the data layer, not merely in the copy of the notification.
+    $requestedClass = normalize_vehicle_type($req['requested_vehicle_type'] ?? null);
+    $drivers = find_nearby_pickup_drivers($pdo, (float)$req['pickup_lat'], (float)$req['pickup_lng'],
+        is_private_pickup_vehicle_type($requestedClass) ? $requestedClass : null);
     if (!$drivers) {
         return 0;
     }
 
-    $tripKm = calculate_distance_km(
-        (float)$req['pickup_lat'], (float)$req['pickup_lng'],
-        (float)$req['destination_lat'], (float)$req['destination_lng']
-    );
-
-    // Each driver is quoted their OWN vehicle class's fare - a car driver must
-    // not be alerted at the keke rate and then paid the car rate on accept.
-    // Cached per class so a large match set still prices with two lookups.
-    $fareByClass = [];
+    // The alert quotes the passenger's opening fare (the trip-only figure the
+    // passenger is looking at). For a car this is the final price; for a keke
+    // it is the starting point the matched driver may revise upward for the
+    // repositioning leg, with the passenger's consent (criterion #3). It is
+    // deliberately the SAME number both sides see while searching (criterion #2).
+    $openingFare = round((float)$req['price'], 2);
 
     $count = 0;
     foreach ($drivers as $d) {
-        $class = normalize_vehicle_type($d['vehicle_type'] ?? null);
-        if (!isset($fareByClass[$class])) {
-            $fareByClass[$class] = estimate_private_pickup_fare($pdo, $tripKm, $class);
-        }
-        $fareInfo = $fareByClass[$class];
-
         create_notification($pdo, (int)$d['id'], [
             'title' => 'New Private Pickup request',
-            'message' => "Pickup: {$req['pickup_location']} -> {$req['destination']} - " . number_format($d['distance_km'], 1) . "km away - ~ N" . number_format($fareInfo['total'], 0),
+            'message' => "Pickup: {$req['pickup_location']} -> {$req['destination']} - " . number_format($d['distance_km'], 1) . "km away - ~ N" . number_format($openingFare, 0),
             'notification_type' => 'ride_request',
             'priority' => 'critical', // must break through so the driver hears the beep
             'action' => 'open_pickup_request',
@@ -285,7 +296,7 @@ function notify_nearby_drivers_of_request(PDO $pdo, int $requestId): int {
                 'sound' => 'warning', // valid sound-manager type -> actual audible beep
                 'request_public_id' => $req['public_id'],
                 'distance_km' => $d['distance_km'],
-                'fare' => $fareInfo['total'],
+                'fare' => $openingFare,
                 'expires_at' => $req['expires_at'],
             ],
         ]);
@@ -298,8 +309,13 @@ function notify_nearby_drivers_of_request(PDO $pdo, int $requestId): int {
  * Driver-side matching query: online, private-pickup-enabled, available
  * today, verified drivers whose last known coordinates are within the
  * configured radius. Returns rows with distance_km, nearest first.
+ *
+ * $vehicleType, when a valid Private Pickup class, restricts the match to
+ * drivers of exactly that class (criterion #5) - a car request must reach
+ * only car drivers. When null the match spans every Private Pickup class
+ * (used where the caller has no specific class in hand).
  */
-function find_nearby_pickup_drivers(PDO $pdo, float $pickupLat, float $pickupLng): array {
+function find_nearby_pickup_drivers(PDO $pdo, float $pickupLat, float $pickupLng, ?string $vehicleType = null): array {
     $radius = (float) get_system_setting($pdo, 'private_pickup_radius_km', 20);
     $today  = date('Y-m-d');
     // A driver whose last GPS ping is older than this is treated as gone -
@@ -312,11 +328,16 @@ function find_nearby_pickup_drivers(PDO $pdo, float $pickupLat, float $pickupLng
     $cosLat = max(0.01, cos(deg2rad($pickupLat)));
     $lngDelta = $radius / (111.0 * $cosLat);
 
-    // The eligible vehicle classes are named by eligibility.php so the match
-    // set and the operational gate can never disagree (a driver discovered
-    // here but rejected at accept, or vice versa). Bound as placeholders
-    // rather than interpolated, keeping the query prepared-statement clean.
-    $vehicleTypes = private_pickup_vehicle_types();
+    // Class restriction: a specific requested class narrows to that one class;
+    // otherwise the whole Private Pickup set (named by eligibility.php so the
+    // match set and the operational gate can never disagree). Bound as
+    // placeholders rather than interpolated, keeping the query prepared-clean.
+    $wantClass = normalize_vehicle_type($vehicleType);
+    if (is_private_pickup_vehicle_type($wantClass)) {
+        $vehicleTypes = [$wantClass];
+    } else {
+        $vehicleTypes = private_pickup_vehicle_types();
+    }
     $vehiclePlaceholders = implode(',', array_fill(0, count($vehicleTypes), '?'));
 
     $stmt = $pdo->prepare(
@@ -401,67 +422,192 @@ function get_driver_pickup_feed(PDO $pdo, int $driverId): array {
 
     $radius = (float) get_system_setting($pdo, 'private_pickup_radius_km', 20);
     $driverClass = normalize_vehicle_type($driver['vehicle_type'] ?? null);
+    $driverLat = (float)$driver['latitude'];
+    $driverLng = (float)$driver['longitude'];
+
+    // Only requests whose passenger chose THIS driver's class are shown
+    // (criterion #5). The equality bind excludes the pre-column NULL rows
+    // (there are none in practice) rather than mis-serving them.
     $stmt = $pdo->prepare(
         "SELECT r.id, r.public_id, r.pickup_location, r.pickup_lat, r.pickup_lng,
                 r.destination, r.destination_lat, r.destination_lng, r.notes,
-                r.price, r.expires_at, r.created_at,
+                r.price, r.requested_vehicle_type, r.expires_at, r.created_at,
                 u.fullname AS rider_name, u.rating AS rider_rating
          FROM ride_requests r
          JOIN users u ON u.id = r.rider_id
          WHERE r.request_type = 'private_pickup' AND r.status = 'pending'
            AND r.expires_at > NOW()
+           AND r.requested_vehicle_type = ?
          ORDER BY r.created_at ASC"
     );
-    $stmt->execute();
+    $stmt->execute([$driverClass]);
+
+    $ctx = ['lat' => $driverLat, 'lng' => $driverLng, 'location_fresh' => true];
 
     $requests = [];
     foreach ($stmt->fetchAll() as $r) {
-        $dist = calculate_distance_km((float)$driver['latitude'], (float)$driver['longitude'], (float)$r['pickup_lat'], (float)$r['pickup_lng']);
+        $dist = calculate_distance_km($driverLat, $driverLng, (float)$r['pickup_lat'], (float)$r['pickup_lng']);
         if ($dist > $radius) {
             continue;
         }
-        $trip_km = calculate_distance_km((float)$r['pickup_lat'], (float)$r['pickup_lng'], (float)$r['destination_lat'], (float)$r['destination_lng']);
-        // Priced for this driver's class, not from the request's pre-match
-        // placeholder - the figure shown here is the one accept() will honour.
-        $fare = estimate_private_pickup_fare($pdo, $trip_km, $driverClass);
+        // The exact fare THIS driver would be paid on accept. For a keke this
+        // includes the repositioning leg (driver -> pickup) + trip (criterion
+        // #7); for a car it is trip-only (criterion #9). Computed by the same
+        // helper accept() uses, so the number shown here is the number honoured.
+        $fareCtx = pp_compute_driver_fare($pdo, $r, $ctx, $driverClass);
+        $passengerOffer = round((float)$r['price'], 2);
+        $yourFare = $fareCtx['fare'];
+        // If the driver's fare differs from what the passenger is looking at,
+        // accepting cannot silently change the price - it must be PROPOSED and
+        // the passenger must consent (criteria #2/#3/#4). The client uses this
+        // flag to show "Propose N.." instead of a one-tap "Accept".
+        $requiresConsent = abs($yourFare - $passengerOffer) >= 0.01;
         $requests[] = [
             'request_public_id' => $r['public_id'],
             'pickup_location'   => $r['pickup_location'],
             'destination'       => $r['destination'],
             'notes'             => $r['notes'],
             'distance_to_pickup_km' => $dist,
-            'trip_distance_km'  => $trip_km,
-            'fare'              => round($fare['total'], 2),
-            'vehicle_type'      => $fare['vehicle_type'],
+            'reposition_km'     => round($fareCtx['reposition_km'], 2),
+            'trip_distance_km'  => round($fareCtx['trip_km'], 2),
+            'passenger_offer'   => $passengerOffer,
+            'your_fare'         => $yourFare,
+            'requires_consent'  => $requiresConsent,
+            'fare'              => $yourFare, // back-compat alias for existing client reads
+            'vehicle_type'      => $driverClass,
+            'vehicle_type_label'=> vehicle_type_label($driverClass),
             'rider_name'        => $r['rider_name'],
             'rider_rating'      => $r['rider_rating'],
             'expires_at'        => $r['expires_at'],
             'created_at'        => $r['created_at'],
         ];
     }
-    return ['eligible' => true, 'reason' => '', 'requests' => $requests];
+    // Outstanding proposals this driver is waiting on. Once a driver proposes
+    // a fare the request leaves the pending pool (status='accepted',
+    // proposed_fare set, no trip spawned yet), so it would otherwise vanish
+    // from the driver's screen entirely. Surface it as a distinct, read-only
+    // "waiting for the passenger" card so the driver sees the live negotiation
+    // status without stale data (criteria #5/#8). It disappears on its own when
+    // the rider accepts (→ trip, shows under Trips) or rejects (→ the request
+    // reopens into the pending feed). This is additive; the pending `requests`
+    // feed above is untouched.
+    $propStmt = $pdo->prepare(
+        "SELECT r.public_id, r.pickup_location, r.destination, r.price, r.proposed_fare,
+                r.requested_vehicle_type, r.accepted_at,
+                u.fullname AS rider_name
+         FROM ride_requests r
+         JOIN users u ON u.id = r.rider_id
+         WHERE r.request_type = 'private_pickup' AND r.status = 'accepted'
+           AND r.driver_id = ? AND r.proposed_fare IS NOT NULL
+           AND r.matched_ride_share_id IS NULL
+         ORDER BY r.accepted_at DESC"
+    );
+    $propStmt->execute([$driverId]);
+    $proposals = [];
+    foreach ($propStmt->fetchAll() as $p) {
+        $pClass = normalize_vehicle_type($p['requested_vehicle_type'] ?? null);
+        $proposals[] = [
+            'request_public_id'  => $p['public_id'],
+            'pickup_location'    => $p['pickup_location'],
+            'destination'        => $p['destination'],
+            'passenger_offer'    => round((float)$p['price'], 2),
+            'proposed_fare'      => round((float)$p['proposed_fare'], 2),
+            'vehicle_type'       => $pClass,
+            'vehicle_type_label' => vehicle_type_label($pClass),
+            'rider_name'         => $p['rider_name'],
+        ];
+    }
+
+    return ['eligible' => true, 'reason' => '', 'requests' => $requests, 'proposals' => $proposals];
 }
 
 /**
- * ATOMIC single-winner acceptance. Reuses the SAME trip engine as Join Ride:
- * on winning, spawns a private ride_shares row (ride_mode='private',
- * vehicle_reserved=1), reserves commission, and links the request to it.
- * Returns ['status','message','data'].
+ * The driver's class and freshest known location - everything needed to
+ * price their run and to decide whether a keke's location is fresh enough
+ * to include a repositioning leg (criteria #7/#8). Age is computed by MySQL
+ * (TIMESTAMPDIFF) for the same PHP/MySQL timezone reason documented above.
  */
-function accept_private_pickup_request(PDO $pdo, int $driverId, string $requestPublicId): array {
-    // Re-validate eligibility at the moment of accept (revocation-safe).
+function pp_driver_context(PDO $pdo, int $driverId): array {
+    $stmt = $pdo->prepare(
+        "SELECT u.latitude, u.longitude,
+                TIMESTAMPDIFF(SECOND, u.last_location_update, NOW()) AS age,
+                v.vehicle_type
+         FROM users u
+         LEFT JOIN vehicles v ON v.driver_id = u.id
+         WHERE u.id = ?"
+    );
+    $stmt->execute([$driverId]);
+    $r = $stmt->fetch() ?: [];
+    $ttl = (int) get_system_setting($pdo, 'driver_location_ttl_seconds', 120);
+    $hasLoc = ($r['latitude'] ?? null) !== null && ($r['longitude'] ?? null) !== null && ($r['age'] ?? null) !== null;
+    return [
+        'class' => normalize_vehicle_type($r['vehicle_type'] ?? null),
+        'lat' => $hasLoc ? (float)$r['latitude'] : null,
+        'lng' => $hasLoc ? (float)$r['longitude'] : null,
+        'location_fresh' => $hasLoc && (int)$r['age'] <= $ttl,
+    ];
+}
+
+/**
+ * Compute the fare THIS driver would be paid for a given request.
+ *
+ *   Keke Private Pickup = (driver's current location -> passenger pickup)
+ *                       + (pickup -> destination), priced on the keke card.
+ *   Car  Private Pickup = (pickup -> destination) only, on the car card.
+ *
+ * This is the ONLY place the four-lane distinction for Private Pickup is
+ * applied (criteria #7/#9/#10); Join Ride pricing is never touched.
+ * Returns fare (rounded total) plus the leg breakdown for transparency.
+ */
+function pp_compute_driver_fare(PDO $pdo, array $req, array $ctx, string $driverClass): array {
+    $trip_km = calculate_distance_km((float)$req['pickup_lat'], (float)$req['pickup_lng'], (float)$req['destination_lat'], (float)$req['destination_lng']);
+    $reposition_km = 0.0;
+    if ($driverClass === 'keke' && ($ctx['lat'] ?? null) !== null && ($ctx['lng'] ?? null) !== null) {
+        $reposition_km = calculate_distance_km((float)$ctx['lat'], (float)$ctx['lng'], (float)$req['pickup_lat'], (float)$req['pickup_lng']);
+    }
+    $billed_km = $reposition_km + $trip_km;
+    $fareInfo = estimate_private_pickup_fare($pdo, $billed_km, $driverClass);
+    return [
+        'fare' => round($fareInfo['total'], 2),
+        'trip_km' => $trip_km,
+        'reposition_km' => $reposition_km,
+        'billed_km' => $billed_km,
+        'info' => $fareInfo,
+    ];
+}
+
+/**
+ * Core driver engagement. ATOMIC single-winner claim, then either:
+ *   - FINALISE (fare unchanged from the passenger's offer -> agreement) by
+ *     spawning the private ride_shares trip and moving it to PASSENGERS_JOINING
+ *     (driver en route to the one passenger), or
+ *   - PROPOSE (fare changed) by recording proposed_fare and notifying the
+ *     passenger, WITHOUT spawning a trip and WITHOUT touching price.
+ *
+ * $proposedAmount null = "accept" (only finalises at the unchanged offer, else
+ * auto-proposes the computed fare); a value = "propose that amount" (finalises
+ * only if it equals the offer). A changed price can NEVER be made final by the
+ * driver alone - the passenger must consent (criteria #2/#3/#4), enforced here
+ * in the backend rather than by hiding a button.
+ */
+function pp_engage_request(PDO $pdo, int $driverId, string $requestPublicId, ?float $proposedAmount): array {
+    // Re-validate eligibility at the moment of engagement (revocation-safe).
     $elig = check_driver_eligibility($pdo, $driverId, 'private_pickup');
     if (!$elig['eligible']) {
         return ['status' => 'error', 'message' => $elig['reason']];
     }
 
+    $ctx = pp_driver_context($pdo, $driverId);
+    $driverClass = $ctx['class'];
+    if (!is_private_pickup_vehicle_type($driverClass)) {
+        return ['status' => 'error', 'message' => 'Your vehicle is not eligible for Private Pickup.'];
+    }
+
     $pdo->beginTransaction();
     try {
-        // Lock the request row, then claim it only if still pending. The
-        // affected-row count from the guarded UPDATE is the single arbiter.
-        // Expiry is evaluated by MySQL against its own NOW() - comparing a
-        // MySQL timestamp to PHP's time() would pick up the PHP/MySQL
-        // timezone offset as a phantom hour and expire every live request.
+        // Lock the request, then claim only if still pending. Expiry is judged
+        // by MySQL against its own NOW() - never PHP time() - to avoid the
+        // PHP/MySQL timezone offset expiring live requests.
         $stmt = $pdo->prepare(
             "SELECT *, (expires_at IS NOT NULL AND expires_at < NOW()) AS is_expired
              FROM ride_requests
@@ -479,53 +625,288 @@ function accept_private_pickup_request(PDO $pdo, int $driverId, string $requestP
             throw new Exception('This request has expired.');
         }
 
-        $claim = $pdo->prepare("UPDATE ride_requests SET status = 'accepted', driver_id = ?, accepted_at = NOW() WHERE id = ? AND status = 'pending'");
-        $claim->execute([$driverId, $req['id']]);
-        if ($claim->rowCount() !== 1) {
-            // Someone else won between our SELECT and UPDATE.
-            throw new Exception('This request has already been taken.');
+        // Class must match what the passenger asked for (criterion #5),
+        // enforced in the backend - a car driver can never take a keke request
+        // or vice versa, even by calling this endpoint directly.
+        $reqClass = normalize_vehicle_type($req['requested_vehicle_type'] ?? null);
+        if ($reqClass !== '' && $reqClass !== $driverClass) {
+            throw new Exception('This request is for a ' . vehicle_type_label($reqClass) . ' and cannot be taken with your vehicle.');
         }
 
-        // Spawn the private trip on the existing ride_shares engine.
-        $rideId = spawn_private_ride_from_request($pdo, $driverId, $req);
+        // A keke's fare depends on its current location, so that location must
+        // be fresh; refuse rather than price a repositioning leg off a stale
+        // fix (criteria #8/#18 - never fabricate location). Cars are trip-only
+        // and location-independent, so freshness is not required to price them.
+        if ($driverClass === 'keke' && !$ctx['location_fresh']) {
+            throw new Exception('Your location is out of date. Refresh your location before taking a Keke pickup.');
+        }
 
-        // Link request -> trip.
-        $pdo->prepare("UPDATE ride_requests SET matched_ride_share_id = ?, status = 'in_progress' WHERE id = ?")
-            ->execute([$rideId, $req['id']]);
+        $fareCtx = pp_compute_driver_fare($pdo, $req, $ctx, $driverClass);
+        $offer = round((float)$req['price'], 2);
+        $fare  = $proposedAmount !== null ? round($proposedAmount, 2) : $fareCtx['fare'];
+        if ($fare <= 0) {
+            throw new Exception('That fare is not valid.');
+        }
 
+        // Same number on both sides -> finalise. Any difference -> proposal.
+        if (abs($fare - $offer) < 0.01) {
+            $claim = $pdo->prepare("UPDATE ride_requests SET status = 'accepted', driver_id = ?, accepted_at = NOW(), proposed_fare = NULL WHERE id = ? AND status = 'pending'");
+            $claim->execute([$driverId, $req['id']]);
+            if ($claim->rowCount() !== 1) {
+                throw new Exception('This request has already been taken.');
+            }
+
+            // Spawn at the agreed price - NO re-pricing (criteria #2/#14).
+            $rideId = spawn_private_ride_from_request($pdo, $driverId, $req, $offer, $driverClass);
+            $pdo->prepare("UPDATE ride_requests SET matched_ride_share_id = ?, status = 'in_progress' WHERE id = ?")
+                ->execute([$rideId, $req['id']]);
+            $pdo->commit();
+
+            // En route to pickup. PUBLISHED is a Join Ride broadcast state that
+            // would spam nearby riders; a private trip goes straight to
+            // PASSENGERS_JOINING (driver heading to the single passenger). The
+            // driver marks arrival later, moving it to PASSENGERS_ASSEMBLED.
+            transition_trip_state($pdo, $rideId, 'PASSENGERS_JOINING', 'MANUAL_DRIVER_ACTION');
+
+            create_notification($pdo, (int)$req['rider_id'], [
+                'title' => 'Driver on the way',
+                'message' => 'A driver accepted your private pickup and is heading to you.',
+                'notification_type' => 'booking', 'priority' => 'high',
+                'action' => 'open_trip', 'action_id' => $rideId, 'related_table' => 'ride_shares', 'link' => 'trips.php',
+            ]);
+
+            return ['status' => 'success', 'message' => 'Pickup accepted.', 'data' => [
+                'outcome' => 'accepted',
+                'ride_share_id' => $rideId,
+                'request_public_id' => $requestPublicId,
+                'fare' => $offer,
+            ]];
+        }
+
+        // PROPOSAL: claim the request for this driver and record the counter
+        // offer WITHOUT spawning a trip. `price` (what the passenger currently
+        // agrees to) is deliberately left untouched; proposed_fare carries the
+        // new number until the passenger consents (criterion #3).
+        $claim = $pdo->prepare("UPDATE ride_requests SET status = 'accepted', driver_id = ?, accepted_at = NOW(), proposed_fare = ? WHERE id = ? AND status = 'pending'");
+        $claim->execute([$driverId, $fare, $req['id']]);
+        if ($claim->rowCount() !== 1) {
+            throw new Exception('This request has already been taken.');
+        }
         $pdo->commit();
+
+        create_notification($pdo, (int)$req['rider_id'], [
+            'title' => 'Driver proposed a fare',
+            'message' => 'A driver offered to take your pickup for N' . number_format($fare, 0) . '. Review and confirm.',
+            'notification_type' => 'booking', 'priority' => 'high',
+            'action' => 'open_pickup_proposal', 'related_table' => 'ride_requests',
+            'related_public_id' => $requestPublicId, 'link' => 'private-pickup.php',
+            'meta' => ['sound' => 'info', 'request_public_id' => $requestPublicId, 'proposed_fare' => $fare],
+        ]);
+
+        return ['status' => 'success', 'message' => 'Fare proposed. Waiting for the passenger to confirm.', 'data' => [
+            'outcome' => 'proposed',
+            'request_public_id' => $requestPublicId,
+            'proposed_fare' => $fare,
+            'passenger_offer' => $offer,
+        ]];
     } catch (Exception $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
         return ['status' => 'error', 'message' => $e->getMessage()];
     }
+}
 
-    // Post-commit side effects (never roll back the accept).
-    transition_trip_state($pdo, $rideId, 'PUBLISHED', 'MANUAL_DRIVER_ACTION');
-    transition_trip_state($pdo, $rideId, 'PASSENGERS_ASSEMBLED', 'system');
+/**
+ * Driver accepts a request at the passenger's current fare. Finalises only if
+ * the driver's computed fare equals the passenger's offer (car, or a keke
+ * already at the pickup point); if repositioning makes it differ, this cannot
+ * silently finalise and instead becomes a proposal the passenger must confirm.
+ */
+function accept_private_pickup_request(PDO $pdo, int $driverId, string $requestPublicId): array {
+    return pp_engage_request($pdo, $driverId, $requestPublicId, null);
+}
 
-    create_notification($pdo, (int)$req['rider_id'], [
-        'title' => 'Driver on the way',
-        'message' => 'A driver accepted your private pickup and is heading to you.',
-        'notification_type' => 'booking',
-        'priority' => 'high',
-        'action' => 'open_trip', 'action_id' => $rideId, 'related_table' => 'ride_shares', 'link' => 'trips.php',
-    ]);
+/**
+ * Driver proposes a fare (default = their computed fare, or a custom amount).
+ * Never final on its own: the passenger must consent unless the proposed
+ * number happens to equal the passenger's current offer (criteria #3/#4).
+ */
+function propose_private_pickup_fare(PDO $pdo, int $driverId, string $requestPublicId, ?float $amount = null): array {
+    if ($amount !== null && $amount <= 0) {
+        return ['status' => 'error', 'message' => 'Enter a valid fare to propose.'];
+    }
+    return pp_engage_request($pdo, $driverId, $requestPublicId, $amount);
+}
 
-    return ['status' => 'success', 'message' => 'Pickup accepted.', 'data' => [
-        'ride_share_id' => $rideId,
-        'request_public_id' => $requestPublicId,
-    ]];
+/**
+ * Passenger responds to a driver's proposed fare.
+ *   accept -> the proposed fare BECOMES the authoritative price and the trip
+ *             is spawned at exactly that number (criteria #2/#14), then moved
+ *             to PASSENGERS_JOINING.
+ *   reject -> the request re-opens (status back to 'pending') with driver_id,
+ *             proposed_fare and accepted_at cleared and a fresh TTL, WITHOUT
+ *             corrupting the original price (criterion #3). Another driver -
+ *             or the same one - can offer again.
+ */
+function respond_to_pickup_proposal(PDO $pdo, int $riderId, string $requestPublicId, bool $accept): array {
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT * FROM ride_requests
+             WHERE public_id = ? AND rider_id = ? AND request_type = 'private_pickup' FOR UPDATE"
+        );
+        $stmt->execute([$requestPublicId, $riderId]);
+        $req = $stmt->fetch();
+        if (!$req) {
+            throw new Exception('Request not found.');
+        }
+        if ($req['status'] !== 'accepted' || $req['proposed_fare'] === null) {
+            throw new Exception('There is no fare waiting for your confirmation.');
+        }
+        $driverId = (int)$req['driver_id'];
+
+        if ($accept) {
+            $agreed = round((float)$req['proposed_fare'], 2);
+            $driverClass = pp_driver_context($pdo, $driverId)['class'];
+            if (!is_private_pickup_vehicle_type($driverClass)) {
+                throw new Exception('The driver is no longer available.');
+            }
+            // The proposed fare becomes THE price; then spawn at that number.
+            $pdo->prepare("UPDATE ride_requests SET price = ?, proposed_fare = NULL WHERE id = ?")
+                ->execute([$agreed, (int)$req['id']]);
+            $req['price'] = $agreed; // spawn reads the agreed number from the row
+            $rideId = spawn_private_ride_from_request($pdo, $driverId, $req, $agreed, $driverClass);
+            $pdo->prepare("UPDATE ride_requests SET matched_ride_share_id = ?, status = 'in_progress' WHERE id = ?")
+                ->execute([$rideId, (int)$req['id']]);
+            $pdo->commit();
+
+            transition_trip_state($pdo, $rideId, 'PASSENGERS_JOINING', 'MANUAL_PASSENGER_CONSENT');
+            create_notification($pdo, $driverId, [
+                'title' => 'Passenger accepted your fare',
+                'message' => 'Your proposed fare of N' . number_format($agreed, 0) . ' was accepted. Head to the pickup point.',
+                'notification_type' => 'booking', 'priority' => 'high',
+                'action' => 'open_trip', 'action_id' => $rideId, 'related_table' => 'ride_shares',
+            ]);
+            return ['status' => 'success', 'message' => 'Fare confirmed. Your driver is on the way.', 'data' => [
+                'outcome' => 'accepted', 'ride_share_id' => $rideId, 'fare' => $agreed,
+            ]];
+        }
+
+        // Reject: reopen with a fresh TTL, price untouched.
+        $ttl = (int) get_system_setting($pdo, 'private_pickup_request_ttl_seconds', 90);
+        $pdo->prepare(
+            "UPDATE ride_requests
+             SET status = 'pending', driver_id = NULL, proposed_fare = NULL, accepted_at = NULL,
+                 expires_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
+             WHERE id = ?"
+        )->execute([$ttl, (int)$req['id']]);
+        $pdo->commit();
+
+        if ($driverId) {
+            create_notification($pdo, $driverId, [
+                'title' => 'Passenger declined the fare',
+                'message' => 'The passenger declined your proposed fare. The request is open again.',
+                'notification_type' => 'booking', 'priority' => 'normal',
+            ]);
+        }
+        return ['status' => 'success', 'message' => "Fare declined. We'll keep looking for a driver.", 'data' => [
+            'outcome' => 'rejected',
+            'expires_in_seconds' => $ttl, // fresh TTL so the rider's countdown resumes correctly
+        ]];
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        return ['status' => 'error', 'message' => $e->getMessage()];
+    }
+}
+
+/**
+ * Driver marks that they have physically arrived at the pickup point. Moves a
+ * PRIVATE trip from PASSENGERS_JOINING to PASSENGERS_ASSEMBLED, which the trip
+ * engine dispatches as an "arrived" notification to the passenger (criterion
+ * #11). Idempotent; only the assigned driver of a private trip can call it and
+ * it never starts the trip - that still needs the passenger's confirmation.
+ */
+function mark_private_pickup_arrived(PDO $pdo, int $driverId, int $rideId): array {
+    $stmt = $pdo->prepare("SELECT id, driver_id, ride_mode, trip_state, status FROM ride_shares WHERE id = ?");
+    $stmt->execute([$rideId]);
+    $ride = $stmt->fetch();
+    if (!$ride) {
+        return ['status' => 'error', 'message' => 'Trip not found.'];
+    }
+    if ((int)$ride['driver_id'] !== $driverId) {
+        return ['status' => 'error', 'message' => 'This is not your trip.'];
+    }
+    if ($ride['ride_mode'] !== 'private') {
+        return ['status' => 'error', 'message' => 'This action is only for private pickups.'];
+    }
+    if ($ride['status'] === 'in_progress') {
+        return ['status' => 'error', 'message' => 'The trip has already started.'];
+    }
+    if (!in_array($ride['trip_state'], ['PASSENGERS_JOINING', 'PASSENGERS_ASSEMBLED'], true)) {
+        return ['status' => 'error', 'message' => 'You can only mark arrival once you are on the way to the passenger.'];
+    }
+    if ($ride['trip_state'] !== 'PASSENGERS_ASSEMBLED') {
+        transition_trip_state($pdo, $rideId, 'PASSENGERS_ASSEMBLED', 'MANUAL_DRIVER_ACTION');
+    }
+    return ['status' => 'success', 'message' => 'Passenger notified that you have arrived.', 'data' => ['ride_share_id' => $rideId]];
+}
+
+/**
+ * Passenger confirms the driver has actually arrived. Records
+ * passenger_arrival_confirmed_at, which is the fact the hard start-trip gate
+ * (criterion #12) requires before the driver may start. Only valid once the
+ * driver has marked arrival (trip_state = PASSENGERS_ASSEMBLED).
+ */
+function confirm_private_pickup_arrival(PDO $pdo, int $riderId, string $requestPublicId): array {
+    $stmt = $pdo->prepare(
+        "SELECT r.id, r.matched_ride_share_id, rs.trip_state, rs.driver_id, rs.status,
+                rs.passenger_arrival_confirmed_at
+         FROM ride_requests r
+         JOIN ride_shares rs ON rs.id = r.matched_ride_share_id
+         WHERE r.public_id = ? AND r.rider_id = ? AND r.request_type = 'private_pickup'"
+    );
+    $stmt->execute([$requestPublicId, $riderId]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        return ['status' => 'error', 'message' => 'Trip not found.'];
+    }
+    if ($row['passenger_arrival_confirmed_at'] !== null) {
+        return ['status' => 'success', 'message' => 'Arrival already confirmed.', 'data' => ['already' => true, 'ride_share_id' => (int)$row['matched_ride_share_id']]];
+    }
+    if ($row['trip_state'] !== 'PASSENGERS_ASSEMBLED') {
+        return ['status' => 'error', 'message' => 'Your driver has not marked arrival yet.'];
+    }
+    $pdo->prepare("UPDATE ride_shares SET passenger_arrival_confirmed_at = NOW() WHERE id = ?")
+        ->execute([(int)$row['matched_ride_share_id']]);
+
+    if (!empty($row['driver_id'])) {
+        create_notification($pdo, (int)$row['driver_id'], [
+            'title' => 'Passenger confirmed arrival',
+            'message' => 'Your passenger confirmed you have arrived. You can start the trip.',
+            'notification_type' => 'booking', 'priority' => 'high',
+            'action' => 'open_trip', 'action_id' => (int)$row['matched_ride_share_id'], 'related_table' => 'ride_shares',
+        ]);
+    }
+    return ['status' => 'success', 'message' => 'Arrival confirmed. Your driver can now start the trip.', 'data' => ['ride_share_id' => (int)$row['matched_ride_share_id']]];
 }
 
 /**
  * Build a private ride_shares trip from an accepted request, reusing the
  * exact columns, commission model and wallet reservation that Join Ride's
  * create action uses. Returns the new ride_shares id. Must run inside the
- * accept transaction.
+ * caller's transaction.
+ *
+ * $agreedFare is THE authoritative fare both sides settled on - passed in by
+ * the caller (the passenger's unchanged offer, or a proposed fare the
+ * passenger consented to). This function does NOT re-price and does NOT
+ * overwrite ride_requests.price: the number the passenger agreed to is the
+ * number the trip, payment, commission and receipt are all built on
+ * (criteria #2/#14). $vehicleClass selects only the commission rate card.
  */
-function spawn_private_ride_from_request(PDO $pdo, int $driverId, array $req): int {
+function spawn_private_ride_from_request(PDO $pdo, int $driverId, array $req, float $agreedFare, string $vehicleClass): int {
     $vehStmt = $pdo->prepare("SELECT * FROM vehicles WHERE driver_id = ?");
     $vehStmt->execute([$driverId]);
     $vehicle = $vehStmt->fetch();
@@ -533,26 +914,17 @@ function spawn_private_ride_from_request(PDO $pdo, int $driverId, array $req): i
         throw new Exception('Your vehicle record is missing.');
     }
 
-    $distance_km = calculate_distance_km((float)$req['pickup_lat'], (float)$req['pickup_lng'], (float)$req['destination_lat'], (float)$req['destination_lng']);
+    $fare = round($agreedFare, 2);
+    if ($fare <= 0) {
+        throw new Exception('The agreed fare is not valid.');
+    }
 
-    // THE authoritative price. The request was stamped before any driver was
-    // known, so it carries the default-class placeholder; the trip is priced
-    // from the class that is actually going to run it. A keke pickup is
-    // charged at keke rates and a car pickup at car rates, from the admin's
-    // settings - never from a figure the client supplied or an earlier guess.
-    $vehicleClass = normalize_vehicle_type($vehicle['vehicle_type'] ?? null);
-    $fareInfo = estimate_private_pickup_fare($pdo, $distance_km, $vehicleClass);
-    $fare = round($fareInfo['total'], 2);
-
-    // Keep the request row in step, so the rider's status poll and the
-    // driver feed report the same number the trip and payment were built on.
-    $pdo->prepare("UPDATE ride_requests SET price = ?, platform_fee = ? WHERE id = ?")
-        ->execute([$fare, round($fareInfo['platform_fee'], 2), (int)$req['id']]);
-
-    // A driver-specific commission rate still wins over the class rate -
-    // get_commission_percentage() resolves the override, falling back to the
-    // class's Private Pickup commission instead of the global Join Ride one.
-    $commission_pct = get_commission_percentage($pdo, $driverId, $fareInfo['commission_percentage']);
+    // Commission comes from the class's Private Pickup rate card, then any
+    // driver-specific override (get_commission_percentage) still wins - the
+    // same resolution order used everywhere else, never the global Join Ride
+    // rate by accident.
+    $card = private_pickup_rate_card($pdo, $vehicleClass);
+    $commission_pct = get_commission_percentage($pdo, $driverId, $card['commission_percentage']);
     $commission_amount = round($fare * $commission_pct / 100, 2);
     $driver_earning = round($fare - $commission_amount, 2);
 
@@ -653,11 +1025,14 @@ function expire_stale_pickup_requests(PDO $pdo): void {
 function get_private_pickup_status(PDO $pdo, int $riderId, string $requestPublicId): array {
     expire_stale_pickup_requests($pdo);
     $stmt = $pdo->prepare(
-        "SELECT r.public_id, r.status, r.price, r.matched_ride_share_id,
-                rs.public_id AS ride_public_id, rs.trip_state,
+        "SELECT r.public_id, r.status, r.price, r.proposed_fare, r.requested_vehicle_type,
+                r.matched_ride_share_id,
+                rs.public_id AS ride_public_id, rs.trip_state, rs.driver_id AS ride_driver_id,
+                rs.passenger_arrival_confirmed_at,
                 rb.id AS booking_id, rb.public_id AS booking_public_id,
                 d.fullname AS driver_name, d.rating AS driver_rating, d.latitude AS driver_lat, d.longitude AS driver_lng,
-                dv.vehicle_type AS driver_vehicle_type
+                dv.vehicle_type AS driver_vehicle_type, dv.make AS driver_vehicle_make,
+                dv.model AS driver_vehicle_model, dv.color AS driver_vehicle_color, dv.plate_number AS driver_plate
          FROM ride_requests r
          LEFT JOIN ride_shares rs ON rs.id = r.matched_ride_share_id
          LEFT JOIN ride_share_bookings rb ON rb.ride_share_id = rs.id AND rb.rider_id = r.rider_id
@@ -670,10 +1045,27 @@ function get_private_pickup_status(PDO $pdo, int $riderId, string $requestPublic
     if (!$row) {
         return ['status' => 'error', 'message' => 'Request not found.'];
     }
-    // r.price is re-stamped from the accepting driver's vehicle class on
-    // accept, so this is the class and the amount the trip was actually
-    // priced at - the rider never sees a figure the trip wasn't built on.
-    $row['vehicle_type'] = normalize_vehicle_type($row['driver_vehicle_type'] ?? null) ?: null;
+
+    // The vehicle class is the one the PASSENGER chose (and the trip runs as),
+    // not merely whatever the matched driver drives - they are the same by the
+    // class-restricted match, but requested_vehicle_type is the source of truth.
+    $reqClass = normalize_vehicle_type($row['requested_vehicle_type'] ?? null);
+    $row['vehicle_type'] = $reqClass !== '' ? $reqClass : (normalize_vehicle_type($row['driver_vehicle_type'] ?? null) ?: null);
     $row['vehicle_type_label'] = $row['vehicle_type'] ? vehicle_type_label($row['vehicle_type']) : null;
+
+    // Normalise the fare fields the client renders. `price` is the single
+    // authoritative current fare (criterion #2); `proposed_fare` is a pending
+    // driver counter-offer awaiting this passenger's consent (NULL if none).
+    $row['current_fare'] = $row['price'] !== null ? round((float)$row['price'], 2) : null;
+    $row['proposed_fare'] = $row['proposed_fare'] !== null ? round((float)$row['proposed_fare'], 2) : null;
+    $row['awaiting_consent'] = ($row['status'] === 'accepted' && $row['proposed_fare'] !== null);
+
+    // Arrival control (criteria #11/#12): driver_arrived once the trip reaches
+    // PASSENGERS_ASSEMBLED; passenger_confirmed_arrival once this passenger has
+    // confirmed. The client shows the "Confirm my driver has arrived" button
+    // exactly when arrived && !confirmed.
+    $row['driver_arrived'] = ($row['trip_state'] === 'PASSENGERS_ASSEMBLED');
+    $row['passenger_confirmed_arrival'] = ($row['passenger_arrival_confirmed_at'] !== null);
+
     return ['status' => 'success', 'message' => 'ok', 'data' => $row];
 }

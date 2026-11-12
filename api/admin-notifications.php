@@ -12,9 +12,12 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: notification view/send is the announcements.send permission.
+// This one call enforces authenticated -> admin mode -> active -> not
+// suspended -> permission, all re-read from the DB (no re-login needed for a
+// permission change or suspension to take effect).
+require_admin_permission($pdo, 'announcements.send');
 
 // Every notification-related setting the Admin Notification Center
 // exposes, with its default — single source of truth for both the

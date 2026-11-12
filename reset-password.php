@@ -36,6 +36,7 @@ if ($token !== '' && is_email_verification_enabled($pdo)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>MohToh — Reset Password</title>
+    <meta name="robots" content="noindex, nofollow">
 
     <?php
     $base_prefix = (strpos($_SERVER['SCRIPT_NAME'], '/driver/') !== false || strpos($_SERVER['SCRIPT_NAME'], '/rider/') !== false || strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) ? '../' : '';

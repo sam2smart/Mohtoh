@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function avatarUrl(p) {
     return p.profile_image && p.profile_image !== 'default.png'
-      ? `../uploads/${encodeURIComponent(p.profile_image)}`
+      ? `../img.php?f=${encodeURIComponent(p.profile_image)}&w=160`
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(p.fullname)}&background=0F8B8D&color=fff`;
   }
 
@@ -522,6 +522,91 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // ---------------------------------------------------------------
+  // Connected accounts (Google / Facebook social login) — present on
+  // both rider and driver profile pages. "Connect" is a full-page
+  // navigation because the OAuth authorization-code flow requires a
+  // top-level redirect (never an XHR). "Disconnect" posts to
+  // api/social-accounts.php with the app CSRF token carried in the JSON
+  // body — the server also re-checks the token, rate-limits, and refuses
+  // to remove the user's only remaining sign-in method.
+  // ---------------------------------------------------------------
+  const connectedAccountsList = qs('#connectedAccountsList');
+
+  function providerIcon(provider) {
+    if (provider === 'google') return '<i class="bi bi-google" style="color:#ea4335;"></i>';
+    if (provider === 'facebook') return '<i class="bi bi-facebook" style="color:#1877f2;"></i>';
+    return '<i class="bi bi-box-arrow-in-right"></i>';
+  }
+
+  async function loadConnectedAccounts() {
+    if (!connectedAccountsList) return;
+    try {
+      const data = await apiGet('../api/social-accounts.php', { action: 'list' });
+      if (data.status !== 'success') throw new Error(data.message);
+      renderConnectedAccounts(data.data);
+    } catch (error) {
+      connectedAccountsList.innerHTML = '<div class="alert-banner error">Could not load connected accounts.</div>';
+    }
+  }
+
+  function renderConnectedAccounts(d) {
+    if (!connectedAccountsList) return;
+    const providers = (d && d.providers) || [];
+    // Show a provider only when it is already connected (so it can be
+    // removed) or currently available to connect. A provider that is
+    // neither is hidden rather than shown as a dead control.
+    const rows = providers.filter((p) => p.connected || p.available);
+    if (!rows.length) {
+      connectedAccountsList.innerHTML = '<div class="u-text-center u-text-faint u-text-sm" style="padding:16px 0;">No social login options are available right now.</div>';
+      return;
+    }
+    connectedAccountsList.innerHTML = rows.map((p) => {
+      let action;
+      if (p.connected) {
+        action = p.can_unlink
+          ? `<button type="button" class="btn btn-outline btn-sm" style="width:auto;" data-unlink-provider="${escapeHtml(p.provider)}">Disconnect</button>`
+          : '<span class="u-text-xs u-text-faint" title="Set a password before removing your only way to sign in.">Only sign-in method</span>';
+      } else {
+        // Anchor, not a button: OAuth linking needs a full-page redirect.
+        action = `<a class="btn btn-outline btn-sm" style="width:auto;text-decoration:none;" href="${escapeHtml(p.link_url)}">Connect</a>`;
+      }
+      const sub = p.connected ? (p.email ? escapeHtml(p.email) : 'Connected') : 'Not connected';
+      return `
+        <div class="info-row" style="align-items:center;">
+          <span class="info-row__label u-flex u-items-center u-gap-2">${providerIcon(p.provider)} <span>${escapeHtml(p.label)}<br><span class="u-text-xs u-text-faint">${sub}</span></span></span>
+          <span class="info-row__value">${action}</span>
+        </div>`;
+    }).join('');
+  }
+
+  connectedAccountsList?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-unlink-provider]');
+    if (!btn) return;
+    const provider = btn.dataset.unlinkProvider;
+    if (!confirm(`Disconnect your ${provider} account from MohToh?`)) return;
+    const token = qs('meta[name="csrf-token"]')?.content || '';
+    setButtonLoading(btn, true, 'Removing…');
+    try {
+      const data = await apiPost('../api/social-accounts.php', { action: 'unlink', provider, csrf_token: token });
+      if (data.status !== 'success') {
+        showToast(data.message || 'Could not disconnect that account.');
+        setButtonLoading(btn, false);
+        return;
+      }
+      showToast(data.message || 'Account disconnected.');
+      renderConnectedAccounts(data.data); // server returns the fresh list
+    } catch (error) {
+      showToast('Something went wrong. Please try again.');
+      setButtonLoading(btn, false);
+    }
+  });
+
+  // Kick off the initial fetch here — after `connectedAccountsList` above
+  // is initialized — rather than alongside loadProfile() at the top, where
+  // that const would still be in its temporal dead zone.
+  loadConnectedAccounts();
 
   // ---- Deep-link a sheet from elsewhere, e.g. partials/sidebar.php's
   // Settings/Ratings links (profile.php?open=settings / ?open=ratings),

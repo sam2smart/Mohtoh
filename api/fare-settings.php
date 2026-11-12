@@ -8,9 +8,10 @@ require_once '../includes/FareCalculator.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized access');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: fare configuration is read-only here (writes are retired)
+// -> pricing.view. Actual pricing writes live in api/pricing-admin.php (SUPER).
+require_admin_permission($pdo, 'pricing.view');
 
 $fareCalc = new FareCalculator($pdo);
 

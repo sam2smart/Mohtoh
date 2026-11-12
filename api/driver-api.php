@@ -7,6 +7,10 @@ require_once __DIR__ . '/../includes/functions.php';
 // the top because the vehicle setup, the document upload and the vehicle
 // read all speak it.
 require_once __DIR__ . '/../includes/eligibility.php';
+// In-place optimizer for newly uploaded VEHICLE PHOTOS only. Verification
+// documents (upload_document below) are deliberately never optimized so their
+// originals stay byte-for-byte identical.
+require_once __DIR__ . '/../includes/image_optimizer.php';
 
 header('Content-Type: application/json');
 
@@ -169,6 +173,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target = $upload_dir . $filename;
 
         if (move_uploaded_file($_FILES['photo']['tmp_name'], $target)) {
+            // Compress/resize the vehicle photo in place (safe no-op if GD is
+            // unavailable; leaves the file untouched on any failure).
+            mt_optimize_uploaded_image($target);
             $stmt = $pdo->prepare("INSERT INTO vehicle_photos (vehicle_id, photo_path, photo_type) VALUES (?, ?, ?)");
             $stmt->execute([$vehicle_id, $filename, $photo_type]);
             json_response('success', 'Vehicle photo uploaded successfully!', ['photo_path' => $filename]);

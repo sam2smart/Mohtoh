@@ -25,6 +25,8 @@ $userType = 'rider';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. disconnecting a social login). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh — Profile</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -121,6 +123,12 @@ $userType = 'rider';
                     <label class="toggle-switch"><input type="checkbox" data-notify-toggle="notify_ride_cancel"><span class="toggle-switch__track"></span></label>
                 </div>
             </section>
+
+            <!-- ================= Login & security ================= -->
+            <div class="section-label">Login &amp; security</div>
+            <section class="card" id="connectedAccountsList">
+                <div class="u-text-center u-text-faint u-text-sm" style="padding:16px 0;">Loading…</div>
+            </section>
         </div>
 
         <?php include __DIR__ . '/../partials/bottom-nav.php'; ?>
@@ -131,7 +139,7 @@ $userType = 'rider';
     <div class="sheet-scrim" data-sheet-scrim></div>
 
     <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
-    <?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+    <?php include __DIR__ . '/../partials/network-sheet.php'; ?>
 
     <!-- ================= Edit profile sheet ================= -->
     <div class="sheet" id="editProfileSheet" role="dialog" aria-modal="true">
@@ -202,7 +210,7 @@ $userType = 'rider';
 <script src="../assets/js/mohtoh-bridge.js"></script>
 <script src="../assets/js/pwa-init.js"></script>
 <script src="../assets/js/navigation.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script src="../assets/js/profile.js"></script>
 </body>
 </html>

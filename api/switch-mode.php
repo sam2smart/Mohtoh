@@ -34,12 +34,17 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/eligibility.php';
+require_once '../includes/admin_permissions.php'; // ensure_admin_rbac_schema() + admin capability fields
 
 header('Content-Type: application/json');
 
 if (!is_logged_in()) {
     json_response('error', 'Unauthorized');
 }
+
+// Self-heal the admin RBAC columns the account SELECT below reads, so a DB
+// where migrate_admin_rbac.php has not run yet cannot fatal on this endpoint.
+ensure_admin_rbac_schema($pdo);
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true);
@@ -57,6 +62,7 @@ $userId = (int) $_SESSION['user_id'];
 // switch attempt rather than at next login.
 $stmt = $pdo->prepare(
     "SELECT u.user_type, u.is_suspended, u.is_keke_driver, u.private_pickup_enabled,
+            u.is_admin, u.admin_status,
             v.id AS vehicle_id, v.vehicle_type, v.status AS vehicle_status,
             v.verification_status AS vehicle_verification_status
      FROM users u
@@ -78,7 +84,16 @@ if ($account['user_type'] === 'admin') {
 
 $hasDriverCapability = ($account['user_type'] === 'driver');
 $vehicleClass = normalize_vehicle_type($account['vehicle_type']); // '' when no vehicle
-$currentMode = ($_SESSION['user_type'] ?? 'rider') === 'driver' ? 'driver' : 'rider';
+$sessionMode = $_SESSION['user_type'] ?? 'rider';
+$currentMode = in_array($sessionMode, ['driver', 'admin'], true) ? $sessionMode : 'rider';
+
+// Admin is an ADDITIVE capability (a rider/driver who is also an admin). It is
+// usable as a mode only when the flag is set, the admin hat is active and the
+// account is not suspended - all read fresh from the DB row above, so a
+// suspension or de-admin takes effect on the next switch with no re-login.
+$hasAdminCapability = !empty($account['is_admin'])
+    && (($account['admin_status'] ?? 'active') === 'active')
+    && empty($account['is_suspended']);
 
 // Full operational eligibility (verified account + verified vehicle). Used to
 // describe the driver side to the UI and to authorise a CLASS selection - not
@@ -93,7 +108,7 @@ $baseEligibility = $hasDriverCapability
  * DB row above. Shared by every action so the client always gets back the
  * state the server actually believes in.
  */
-function switch_mode_state(array $account, bool $hasDriverCapability, string $vehicleClass, string $currentMode, array $baseEligibility): array
+function switch_mode_state(array $account, bool $hasDriverCapability, string $vehicleClass, string $currentMode, array $baseEligibility, bool $hasAdminCapability): array
 {
     $classes = [];
     foreach (['car', 'keke'] as $class) {
@@ -130,11 +145,13 @@ function switch_mode_state(array $account, bool $hasDriverCapability, string $ve
         'driver_ready' => (bool) $baseEligibility['eligible'],
         'driver_blocked_reason' => $baseEligibility['eligible'] ? '' : $baseEligibility['reason'],
         'driver_blocked_code' => $baseEligibility['eligible'] ? '' : $baseEligibility['code'],
+        'is_admin' => $hasAdminCapability,
+        'admin_status' => $account['admin_status'] ?? 'active',
         'classes' => $classes,
     ];
 }
 
-$state = switch_mode_state($account, $hasDriverCapability, $vehicleClass, $currentMode, $baseEligibility);
+$state = switch_mode_state($account, $hasDriverCapability, $vehicleClass, $currentMode, $baseEligibility, $hasAdminCapability);
 
 // ---------------------------------------------------------------- read only
 if ($action === 'get_modes' || $action === '') {
@@ -151,8 +168,23 @@ switch ($action) {
     // ------------------------------------------------------------- switching
     case 'switch': {
         $mode = strtolower(trim((string) ($input['mode'] ?? '')));
-        if (!in_array($mode, ['rider', 'driver'], true)) {
+        if (!in_array($mode, ['rider', 'driver', 'admin'], true)) {
             json_response('error', 'Invalid mode.');
+        }
+
+        // Admin mode is the additive admin hat. Gated on the fresh DB read
+        // ($hasAdminCapability = is_admin AND admin_status active AND not
+        // suspended); the client's word is never trusted. Switching only
+        // rewrites the session, exactly like the rider/driver switches below,
+        // so the person's rider/driver capability and history stay intact.
+        if ($mode === 'admin') {
+            if (!$hasAdminCapability) {
+                json_response('error', 'This account does not have active admin access.', $state + ['code' => 'not_admin']);
+            }
+            $_SESSION['user_type'] = 'admin';
+            $state['current_mode'] = 'admin';
+            $state['current_class'] = null;
+            json_response('success', 'Switched to Admin mode.', $state + ['redirect' => '../admin/dashboard.php']);
         }
 
         // Rider mode is available to every non-admin account, always. It is a

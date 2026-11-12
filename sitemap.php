@@ -9,17 +9,13 @@ echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 
 $baseUrl = rtrim(mt_get_base_url(), '/');
 
-// Static Pages
-$staticPages = ['/', '/about.php', '/join.php'];
+// Static public pages only — only include pages that physically exist and are indexable
+$staticPages = ['/'];
 foreach ($staticPages as $page) {
-    echo "<url><loc>" . $baseUrl . $page . "</loc><changefreq>weekly</changefreq></url>";
+    echo "<url><loc>" . htmlspecialchars($baseUrl . $page, ENT_XML1) . "</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>";
 }
-
-// Active Rides
-$stmt = $pdo->query("SELECT public_id FROM ride_shares WHERE status = 'active'");
-while ($ride = $stmt->fetch()) {
-    echo "<url><loc>" . $baseUrl . "/ride.php?id=" . $ride['public_id'] . "</loc><changefreq>hourly</changefreq></url>";
-}
+// Note: /about.php and /ride.php do not exist in this codebase and are excluded.
+// Note: /join.php is a redirect to index.php and is excluded.
 
 echo '</urlset>';
 ?>

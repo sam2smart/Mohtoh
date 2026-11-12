@@ -13,9 +13,11 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: read access needs reports.view; the money-affecting POST
+// mutations below keep their own require_super_admin($pdo) gate, so a Subadmin
+// can never change commission overrides or grant bonuses/referral rewards.
+require_admin_permission($pdo, 'reports.view');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_super_admin($pdo);

@@ -8,6 +8,9 @@
 // second set of upload rules, the same ones reused for the token-based
 // caller.
 require_once __DIR__ . '/../_bootstrap.php';
+// In-place optimizer for profile + vehicle photos only; documents (below)
+// are never optimized so their originals stay byte-for-byte identical.
+require_once __DIR__ . '/../../../includes/image_optimizer.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     v1_error('This endpoint only accepts POST.', 'method_not_allowed', 405);
@@ -39,6 +42,7 @@ if ($type === 'profile') {
     if (!move_uploaded_file($_FILES['file']['tmp_name'], $uploadDir . $filename)) {
         v1_error('Failed to upload profile image.', 'upload_failed');
     }
+    mt_optimize_uploaded_image($uploadDir . $filename);
     $pdo->prepare("UPDATE users SET profile_image = ? WHERE id = ?")->execute([$filename, $userId]);
     v1_success('Profile image uploaded.', ['file_path' => $filename]);
 }
@@ -63,6 +67,7 @@ if ($type === 'vehicle_photo') {
     if (!move_uploaded_file($_FILES['file']['tmp_name'], $uploadDir . $filename)) {
         v1_error('Failed to save uploaded photo file.', 'upload_failed');
     }
+    mt_optimize_uploaded_image($uploadDir . $filename);
     $pdo->prepare("INSERT INTO vehicle_photos (vehicle_id, photo_path) VALUES (?, ?)")->execute([$vehicleId, $filename]);
     v1_success('Vehicle photo uploaded.', ['file_path' => $filename]);
 }

@@ -23,12 +23,16 @@ require_once '../includes/verification.php'; // normalize_phone_number()
 require_once '../includes/google-maps.php';   // Google Maps provider (map/geocode/directions/distance)
 require_once '../includes/payment-integration.php'; // Paystack payment provider (status + configuration on the integrations row)
 require_once '../includes/secrets.php';        // mask_secret()/decrypt_secret()/secret_is_undecryptable() for the payment card
+require_once '../includes/oauth.php';           // Social Login (Google/Facebook) config + credential test helpers
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || ($_SESSION['user_type'] ?? '') !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: reading (masked) integration settings needs integrations.view;
+// every save and every real test-send below keeps its own require_super_admin($pdo)
+// gate, so a Subadmin can view provider config but never write it or spend on a
+// billable test call. Secrets stay masked before reaching the browser regardless.
+require_admin_permission($pdo, 'integrations.view');
 
 // Whitelisted keys only — mirrors api/pricing-admin.php's PRICING_SETTING_KEYS
 // pattern so no caller can ever write an arbitrary integration_settings row.
@@ -139,13 +143,35 @@ define('MAPS_CONFIG_FIELDS', [
 //   sandbox_mode    -> "1" test / "0" live
 //   enabled         -> the row's status column (enabled/disabled)
 
+// Social Login (Google / Facebook OAuth) — credentials + the per-provider
+// ON/OFF switch, stored in integration_settings exactly like the Email/SMS
+// keys. The client secret / app secret are AES-encrypted at rest (secret =>
+// true) and NEVER leave this API except as a mask. The enable flag controls
+// BOTH the frontend button and the backend authorize/callback (enforced in
+// includes/oauth.php's oauth_provider_usable()), not just the UI. The redirect
+// URI defaults to the app's fixed callback file and is what the admin must
+// register with the provider. 'bool' marks the enable toggle so a save stores
+// it as a plain "1"/"0" rather than as an (encrypted) secret.
+const GOOGLE_OAUTH_KEYS = [
+    'integration_google_oauth_enabled'       => ['short' => 'enabled',       'fallback' => '0', 'secret' => false, 'bool' => true],
+    'integration_google_oauth_client_id'     => ['short' => 'client_id',     'fallback' => '',  'secret' => false],
+    'integration_google_oauth_client_secret' => ['short' => 'client_secret', 'fallback' => '',  'secret' => true],
+    'integration_google_oauth_redirect_uri'  => ['short' => 'redirect_uri',  'fallback' => '',  'secret' => false],
+];
+const FACEBOOK_OAUTH_KEYS = [
+    'integration_facebook_oauth_enabled'      => ['short' => 'enabled',       'fallback' => '0', 'secret' => false, 'bool' => true],
+    'integration_facebook_oauth_app_id'       => ['short' => 'client_id',     'fallback' => '',  'secret' => false],
+    'integration_facebook_oauth_app_secret'   => ['short' => 'client_secret', 'fallback' => '',  'secret' => true],
+    'integration_facebook_oauth_redirect_uri' => ['short' => 'redirect_uri',  'fallback' => '',  'secret' => false],
+];
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (($_GET['action'] ?? '') === 'diagnostics') {
         require_once '../includes/diagnostics.php';
         json_response('success', 'Diagnostics collected', run_integration_diagnostics($pdo));
     }
 
-    $out = ['email' => [], 'sms' => [], 'otp' => [], 'policy' => [], 'verification' => [], 'maps' => [], 'payment' => []];
+    $out = ['email' => [], 'sms' => [], 'otp' => [], 'policy' => [], 'verification' => [], 'maps' => [], 'payment' => [], 'google_oauth' => [], 'facebook_oauth' => []];
     // A secret that is present in the DB but unreadable under the current key
     // (key rotated after the value was saved) surfaces as `needsReentry: true`
     // so the admin UI can prompt a re-save instead of pretending it's unset.
@@ -217,6 +243,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'needsReentry' => $enc !== '' && secret_is_undecryptable($enc),
         ];
     }
+    // Social Login (Google / Facebook) — the ON/OFF switch, public client id
+    // and the fixed redirect URI, plus the secret reported ONLY as a mask. The
+    // decrypted client secret / app secret is NEVER placed in this response, so
+    // the browser can never receive it. `needsReentry` flags a secret that is
+    // stored but no longer decryptable under the current app key. `configured`
+    // and `usable` mirror exactly what includes/oauth.php enforces on the login
+    // flow, so the admin card's status badge can never disagree with reality.
+    $oauthBlock = function (string $provider) use ($pdo): array {
+        $meta = oauth_provider_meta($provider);
+        $cfg = oauth_provider_config($pdo, $provider); // authoritative enabled/configured/usable + redirect fallback
+        $secretRaw = get_integration_setting($pdo, $meta['client_secret_key'], '');
+        $secretUndecryptable = ($secretRaw === INTEGRATION_SECRET_UNDECRYPTABLE);
+        $secretPlainForMask = $secretUndecryptable ? '' : (string) $secretRaw;
+        return [
+            'enabled' => $cfg['enabled'],
+            'client_id' => $cfg['client_id'],
+            'client_secret' => [
+                'configured' => $secretRaw !== '', // sentinel is non-empty => stored-but-unreadable still counts as configured
+                'masked' => mask_secret($secretPlainForMask),
+                'needsReentry' => $secretUndecryptable,
+            ],
+            'redirect_uri' => $cfg['redirect_uri'],
+            'default_redirect_uri' => oauth_default_redirect_uri($provider),
+            'configured' => $cfg['configured'],
+            'usable' => $cfg['usable'],
+        ];
+    };
+    $out['google_oauth'] = $oauthBlock('google');
+    $out['facebook_oauth'] = $oauthBlock('facebook');
+
     json_response('success', 'Integration settings fetched', $out);
 }
 
@@ -438,6 +494,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = $resp['message'] ?? 'Paystack rejected the request — check the secret key.';
         log_integration_event('payment', 'test_connection', 'failed', $msg);
         json_response('error', $msg);
+    }
+
+    // Social Login (Google / Facebook) save — writes the provider's enable
+    // switch, public client id and redirect URI, plus the encrypted secret, to
+    // integration_settings via set_integration_setting() (same encrypted-at-rest
+    // path as the Email/SMS secrets). A blank secret field leaves the stored
+    // credential unchanged, so re-saving other fields never wipes the secret.
+    // Enable/Disable here is the SAME flag oauth_provider_usable() enforces on
+    // the authorize + callback endpoints, so turning a provider off blocks the
+    // backend too — not merely the button. Super-admin only, matching every
+    // other credential write.
+    if ($action === 'save_google_oauth' || $action === 'save_facebook_oauth') {
+        require_super_admin($pdo);
+        $adminId = $_SESSION['user_id'];
+        $provider = $action === 'save_google_oauth' ? 'google' : 'facebook';
+        $keys = $action === 'save_google_oauth' ? GOOGLE_OAUTH_KEYS : FACEBOOK_OAUTH_KEYS;
+        $settings = is_array($input['settings'] ?? null) ? $input['settings'] : [];
+        $changed = [];
+
+        foreach ($keys as $key => $meta) {
+            $shortKey = $meta['short'];
+            if (!array_key_exists($shortKey, $settings)) {
+                continue; // field not part of this submit — leave untouched
+            }
+            $rawValue = $settings[$shortKey];
+            if (!empty($meta['bool'])) {
+                $on = is_bool($rawValue) ? $rawValue : in_array(strtolower((string) $rawValue), ['1', 'true', 'yes', 'on'], true);
+                set_integration_setting($pdo, $adminId, $key, $on ? '1' : '0', false);
+                $changed[] = $shortKey;
+                continue;
+            }
+            $value = is_bool($rawValue) ? ($rawValue ? '1' : '0') : trim((string) $rawValue);
+            if ($meta['secret'] && $value === '') {
+                continue; // blank secret field means "leave the saved credential unchanged"
+            }
+            set_integration_setting($pdo, $adminId, $key, $value, $meta['secret']);
+            $changed[] = $shortKey;
+        }
+
+        // Audit — records WHICH fields changed (never their values; the secret
+        // is masked to '***' inside set_integration_setting()'s own change log).
+        if ($changed) {
+            oauth_log('config_saved', 'success', oauth_provider_label($provider) . ' OAuth settings updated', ['provider' => $provider, 'changed' => $changed]);
+        }
+        json_response('success', $changed ? 'Settings saved.' : 'No changes to save.', ['changed' => $changed]);
+    }
+
+    // Social Login Test Configuration — a server-side probe that proves the
+    // saved credentials are valid WITHOUT performing any real user login. The
+    // secret is used server-to-server only and never returned to the browser;
+    // only a short, safe status is surfaced (never the raw provider payload,
+    // tokens, or codes).
+    if ($action === 'test_google_oauth') {
+        require_super_admin($pdo);
+        $cfg = oauth_provider_config($pdo, 'google');
+        if ($cfg['client_id'] === '' || $cfg['client_secret'] === '') {
+            if (!empty($cfg['secret_undecryptable'])) {
+                json_response('error', 'The saved Client Secret could not be read (encryption key changed). Re-enter it, save, then test.');
+            }
+            json_response('error', 'Enter and save the Google Client ID and Client Secret first, then test.');
+        }
+        // Redeem a deliberately invalid authorization code. If the CREDENTIALS
+        // are valid, Google authenticates the client and rejects only the code
+        // (invalid_grant); bad credentials fail earlier with invalid_client. No
+        // real login occurs and no usable token is ever issued.
+        $resp = oauth_http('POST', 'https://oauth2.googleapis.com/token', [
+            'code' => 'connection-test-invalid-code',
+            'client_id' => $cfg['client_id'],
+            'client_secret' => $cfg['client_secret'],
+            'redirect_uri' => $cfg['redirect_uri'],
+            'grant_type' => 'authorization_code',
+        ]);
+        $err = (string) ($resp['json']['error'] ?? '');
+        if ($err === 'invalid_grant') {
+            oauth_log('config_test', 'success', 'Google OAuth credentials verified', ['provider' => 'google']);
+            json_response('success', 'Google credentials look valid — the client authenticated successfully. Make sure the redirect URI below is registered in your Google Cloud console.');
+        }
+        if ($err === 'invalid_client' || $err === 'unauthorized_client') {
+            oauth_log('config_test', 'failed', 'Google OAuth client rejected', ['provider' => 'google', 'error' => $err]);
+            json_response('error', 'Google rejected the Client ID/Secret. Double-check both values.');
+        }
+        if ($resp['status'] === 0) {
+            oauth_log('config_test', 'failed', 'Google OAuth unreachable', ['provider' => 'google']);
+            json_response('error', 'Could not reach Google to verify the credentials. Please try again.');
+        }
+        oauth_log('config_test', 'failed', 'Google OAuth test inconclusive', ['provider' => 'google', 'error' => substr($err, 0, 40)]);
+        json_response('error', $err !== ''
+            ? ('Google returned "' . $err . '" — check the Client ID, Secret and redirect URI.')
+            : 'Google could not verify the credentials. Please re-check them.');
+    }
+
+    if ($action === 'test_facebook_oauth') {
+        require_super_admin($pdo);
+        $cfg = oauth_provider_config($pdo, 'facebook');
+        if ($cfg['client_id'] === '' || $cfg['client_secret'] === '') {
+            if (!empty($cfg['secret_undecryptable'])) {
+                json_response('error', 'The saved App Secret could not be read (encryption key changed). Re-enter it, save, then test.');
+            }
+            json_response('error', 'Enter and save the Facebook App ID and App Secret first, then test.');
+        }
+        // Request an APP access token (client_credentials): proves the App ID +
+        // App Secret pair is valid with no user interaction. The returned app
+        // token is inspected only for presence and never stored or returned.
+        $resp = oauth_http('GET', 'https://graph.facebook.com/v19.0/oauth/access_token', [
+            'client_id' => $cfg['client_id'],
+            'client_secret' => $cfg['client_secret'],
+            'grant_type' => 'client_credentials',
+        ]);
+        if ($resp['ok'] && !empty($resp['json']['access_token'])) {
+            oauth_log('config_test', 'success', 'Facebook OAuth credentials verified', ['provider' => 'facebook']);
+            json_response('success', 'Facebook credentials look valid — the App ID and Secret were accepted. Make sure the redirect URI below is listed as a Valid OAuth Redirect URI in your Meta app.');
+        }
+        if ($resp['status'] === 0) {
+            oauth_log('config_test', 'failed', 'Facebook OAuth unreachable', ['provider' => 'facebook']);
+            json_response('error', 'Could not reach Facebook to verify the credentials. Please try again.');
+        }
+        oauth_log('config_test', 'failed', 'Facebook OAuth credentials rejected', ['provider' => 'facebook']);
+        json_response('error', 'Facebook rejected the App ID/Secret. Double-check both values.');
     }
 
     json_response('error', 'Unknown action.');

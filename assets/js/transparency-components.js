@@ -12,7 +12,7 @@ const TransparencyUI = {
     return `
       <div class="gallery-grid">
         ${photos.map(photo => `
-          <img src="../uploads/${escapeHtml(photo)}" class="img-thumbnail" style="width: 80px; height: 80px; object-fit: cover;" onclick="openImagePreview('../uploads/${escapeHtml(photo)}')">
+          <img src="../img.php?f=${encodeURIComponent(photo)}&w=160" loading="lazy" class="img-thumbnail" style="width: 80px; height: 80px; object-fit: cover;" onclick="openImagePreview('../uploads/${escapeHtml(photo)}')">
         `).join('')}
       </div>
     `;
@@ -22,7 +22,7 @@ const TransparencyUI = {
     return `
       <div class="card p-3 mb-3">
         <div class="d-flex align-items-center">
-          <img src="${driver.profile_image ? '../uploads/' + escapeHtml(driver.profile_image) : '../assets/images/default-avatar.png'}" class="rounded-circle" style="width: 60px; height: 60px;">
+          <img src="${driver.profile_image ? '../img.php?f=' + encodeURIComponent(driver.profile_image) + '&w=160' : '../assets/images/default-avatar.png'}" class="rounded-circle" style="width: 60px; height: 60px;">
           <div class="ms-3">
             <h5 class="mb-0">${escapeHtml(driver.name)}</h5>
             <div class="small">⭐ ${driver.rating} · ${driver.completed_trips} trips</div>
@@ -37,7 +37,7 @@ const TransparencyUI = {
     return `
       <div class="card p-3">
         <div class="d-flex align-items-center mb-3">
-          <img src="${passenger.profile_image ? '../uploads/' + escapeHtml(passenger.profile_image) : '../assets/images/default-avatar.png'}" class="rounded-circle" style="width: 50px; height: 50px;">
+          <img src="${passenger.profile_image ? '../img.php?f=' + encodeURIComponent(passenger.profile_image) + '&w=160' : '../assets/images/default-avatar.png'}" class="rounded-circle" style="width: 50px; height: 50px;">
           <div class="ms-3">
             <h6 class="mb-0">${escapeHtml(passenger.fullname)}</h6>
             <div class="small">⭐ ${passenger.rating} · ${passenger.completed_trips} trips</div>

@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   let liveTrips = [];      // from my_rides — has trip_state, live GPS, reservation
   let historyTrips = [];   // from get_ride_history — has financials/ratings
+  let contactPassengersRideId = null; // ride whose passenger sheet is currently open (for refresh after confirm/rate)
 
   function haversineKm(lat1, lng1, lat2, lng2) {
     if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null;
@@ -189,13 +190,57 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------
   // Upcoming
   // ---------------------------------------------------------------
+  // Upcoming action row. Join Ride keeps its exact existing controls
+  // (Manage / Edit / Cancel + Start Trip). A Private Pickup trip instead
+  // exposes the arrival handshake: the driver taps "I've Arrived", and the
+  // Start button only appears once the PASSENGER has confirmed that arrival
+  // (criteria #11/#12). Edit is withheld for a private trip because its fare
+  // is the agreed number and must not be re-typed here. The backend enforces
+  // the start gate regardless of what is shown — this is UX, not the control.
+  function upcomingActions(ride) {
+    if (ride.ride_mode !== 'private') {
+      return `
+          <div class="ride-tile__actions">
+            <button type="button" class="btn btn-outline btn-sm" data-open-trip-detail="${ride.id}">Manage</button>
+            <button type="button" class="btn btn-outline btn-sm" data-edit-trip="${ride.id}">Edit</button>
+            <button type="button" class="btn btn-outline btn-sm" data-cancel-trip="${ride.id}" style="color:var(--color-danger);border-color:var(--color-danger);">Cancel</button>
+          </div>
+          <button type="button" class="btn btn-primary u-mt-3" data-start-trip="${ride.id}"><i class="bi bi-play-circle"></i> Start Trip</button>`;
+    }
+    const confirmed = !!ride.passenger_arrival_confirmed_at;
+    let startControl;
+    if (ride.trip_state === 'PASSENGERS_ASSEMBLED' && confirmed) {
+      startControl = `<button type="button" class="btn btn-primary u-mt-3" data-start-trip="${ride.id}"><i class="bi bi-play-circle"></i> Start Trip</button>`;
+    } else if (ride.trip_state === 'PASSENGERS_ASSEMBLED') {
+      startControl = `<button type="button" class="btn btn-primary u-mt-3" disabled><i class="bi bi-hourglass-split"></i> Waiting for passenger to confirm…</button>`;
+    } else if (ride.trip_state === 'PASSENGERS_JOINING') {
+      startControl = `<button type="button" class="btn btn-primary u-mt-3" data-arrived-trip="${ride.id}"><i class="bi bi-geo-alt"></i> I’ve Arrived</button>`;
+    } else {
+      startControl = `<button type="button" class="btn btn-primary u-mt-3" data-start-trip="${ride.id}" disabled><i class="bi bi-play-circle"></i> Start Trip</button>`;
+    }
+    return `
+          <div class="ride-tile__actions">
+            <button type="button" class="btn btn-outline btn-sm" data-open-trip-detail="${ride.id}">Manage</button>
+            <button type="button" class="btn btn-outline btn-sm" data-cancel-trip="${ride.id}" style="color:var(--color-danger);border-color:var(--color-danger);">Cancel</button>
+          </div>
+          ${startControl}`;
+  }
+
   function renderUpcoming(rides) {
     if (!rides.length) {
       listContainer.innerHTML = emptyState('No upcoming trips scheduled.', 'Create Ride', 'dashboard.php?open=create-ride');
       return;
     }
     listContainer.innerHTML = rides.map((ride) => {
-      const expectedEarning = (Number(ride.price_per_passenger) * ride.passengers_joined).toFixed(2);
+      const isPrivate = ride.ride_mode === 'private';
+      // A private pickup is ONE agreed fare, not a per-seat price × seats sum —
+      // show that authoritative number and label it "Agreed fare" so the driver
+      // sees exactly what both sides settled on (criteria #5/#6). Join Ride
+      // keeps its expected-earning projection unchanged.
+      const fareValue = isPrivate
+        ? Number(ride.price_per_passenger).toFixed(2)
+        : (Number(ride.price_per_passenger) * ride.passengers_joined).toFixed(2);
+      const fareLabel = isPrivate ? 'Agreed fare' : 'Expected';
       return `
         <div class="card ride-tile anim-fade-in">
           <div class="ride-tile__top">
@@ -208,16 +253,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="ride-tile__dest"><i class="bi bi-geo-alt-fill" style="color:var(--color-danger)"></i>${escapeHtml(ride.destination)}</div>
           <div class="stat-tile-row u-mt-3">
             <div class="stat-tile"><div class="stat-tile__value">${ride.passengers_joined}</div><div class="stat-tile__label">Passengers</div></div>
-            <div class="stat-tile"><div class="stat-tile__value">${formatNaira(expectedEarning)}</div><div class="stat-tile__label">Expected</div></div>
+            <div class="stat-tile"><div class="stat-tile__value">${formatNaira(fareValue)}</div><div class="stat-tile__label">${fareLabel}</div></div>
             <div class="stat-tile"><div class="stat-tile__value">${formatNaira(ride.reserved_amount || 0)}</div><div class="stat-tile__label">Reserved</div></div>
           </div>
           <div class="u-text-xs u-text-soft u-mt-2">${escapeHtml(ride.vehicle_type || '')} ${escapeHtml((ride.vehicle_info || '').split(';')[0] || '')}</div>
-          <div class="ride-tile__actions">
-            <button type="button" class="btn btn-outline btn-sm" data-open-trip-detail="${ride.id}">Manage</button>
-            <button type="button" class="btn btn-outline btn-sm" data-edit-trip="${ride.id}">Edit</button>
-            <button type="button" class="btn btn-outline btn-sm" data-cancel-trip="${ride.id}" style="color:var(--color-danger);border-color:var(--color-danger);">Cancel</button>
-          </div>
-          <button type="button" class="btn btn-primary u-mt-3" data-start-trip="${ride.id}"><i class="bi bi-play-circle"></i> Start Trip</button>
+          ${upcomingActions(ride)}
         </div>`;
     }).join('');
   }
@@ -246,6 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ${ride.average_rating ? `<div class="u-mt-2"><span class="rating-chip"><i class="bi bi-star-fill"></i> ${Number(ride.average_rating).toFixed(1)} (${ride.rating_count})</span></div>` : '<div class="u-text-xs u-text-faint u-mt-2">Not rated yet</div>'}
         <div class="ride-tile__actions">
           <button type="button" class="btn btn-outline btn-sm" data-open-trip-detail="${ride.id}">View details</button>
+          ${ride.payment_status !== 'settled'
+            ? `<button type="button" class="btn btn-primary btn-sm" data-open-passengers="${ride.id}"><i class="bi bi-cash-coin"></i> Confirm cash payment</button>`
+            : `<button type="button" class="btn btn-outline btn-sm" data-open-passengers="${ride.id}"><i class="bi bi-people"></i> Passengers &amp; ratings</button>`}
         </div>
       </div>
     `).join('');
@@ -368,9 +411,74 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------
   // Contact / view passengers — reuses api/rideshare.php's existing
   // get_passengers (same data driver/dashboard.php's Passengers sheet
-  // already shows); this is a lighter, contact-focused rendering of it.
+  // already shows). Adds two persistent controls the dashboard sheet
+  // only had while a ride was "current": (1) confirm/reject a direct
+  // (cash) payment — the exact confirm_direct_payment/reject_direct_payment
+  // endpoints the dashboard already calls — and (2) rate the passenger
+  // (rate_passenger). Both are reachable from the Completed tab forever,
+  // surviving navigation / refresh / re-login, because they're driven by
+  // server data on every open.
   // ---------------------------------------------------------------
+
+  // Direct-payment confirmation, mirrored from driver/dashboard.php's
+  // renderPaymentSection. Only direct (cash) payments need a driver
+  // decision; wallet fares settle automatically on completion.
+  function paymentBlock(p) {
+    if (p.payment_method !== 'direct') return '';
+    if (p.payment_status === 'PAYMENT_PENDING') {
+      // The confirm/reject endpoints require the booking to be completed
+      // (settlement runs against a finished trip), so only surface the
+      // action once the ride is done; before that just flag that cash is due.
+      if (p.status !== 'completed') {
+        return '<div class="u-text-xs u-text-faint u-mt-2"><i class="bi bi-cash-coin"></i> Cash due — confirm after drop-off</div>';
+      }
+      return `<div class="payment-status-banner"><i class="bi bi-hourglass-split"></i> Cash payment — confirm once received</div>
+        <div class="payment-status-actions">
+          <button type="button" class="btn btn-primary btn-sm" data-confirm-payment="${p.booking_id}">Confirm cash received</button>
+          <button type="button" class="btn btn-outline btn-sm" data-reject-payment="${p.booking_id}" style="color:var(--color-danger);border-color:var(--color-danger);">Not paid</button>
+        </div>`;
+    }
+    if (p.payment_status === 'PAYMENT_CONFIRMED') return '<div class="u-mt-2"><span class="status-pill approved"><i class="bi bi-check-circle"></i> Payment confirmed</span></div>';
+    if (p.payment_status === 'PAYMENT_FAILED') return '<div class="u-mt-2"><span class="status-pill rejected">Payment not received</span></div>';
+    return '';
+  }
+
+  // Driver -> passenger rating (rate_passenger). Only offered on a
+  // completed booking; once rated, the stars become a read-only record.
+  function ratingBlock(p) {
+    if (p.status !== 'completed') return '';
+    const rated = p.driver_rating != null && Number(p.driver_rating) > 0;
+    if (rated) {
+      const n = Number(p.driver_rating);
+      const stars = [1, 2, 3, 4, 5].map((s) => `<i class="bi ${s <= n ? 'bi-star-fill' : 'bi-star'}"></i>`).join('');
+      return `<div class="passenger-rate u-mt-2"><span class="u-text-xs u-text-faint">You rated this passenger</span> <span class="passenger-rate__stars is-readonly">${stars}</span></div>`;
+    }
+    const stars = [1, 2, 3, 4, 5].map((s) => `<button type="button" class="passenger-rate__star" data-star-value="${s}" data-booking="${p.booking_id}"><i class="bi bi-star"></i></button>`).join('');
+    return `<div class="passenger-rate u-mt-2" data-rating-input="${p.booking_id}" data-selected="0">
+        <span class="u-text-xs u-text-faint">Rate this passenger</span>
+        <span class="passenger-rate__stars">${stars}</span>
+        <button type="button" class="btn btn-outline btn-sm" data-submit-rating="${p.booking_id}" style="width:auto;padding-inline:14px;">Submit</button>
+      </div>`;
+  }
+
+  function renderPassengerRow(p) {
+    return `
+      <div class="menu-row" style="cursor:default;flex-wrap:wrap;align-items:flex-start;">
+        <i class="bi bi-person-circle"></i>
+        <span style="flex:1;min-width:0;">
+          <div style="font-weight:600;">${escapeHtml(p.fullname)}</div>
+          <div class="u-text-xs u-text-faint">${escapeHtml(formatPassengerStateLabel(p.passenger_state))}</div>
+        </span>
+        <a href="tel:${escapeHtml(p.phone || '')}" class="btn btn-outline btn-sm" style="width:auto;padding-inline:14px;"><i class="bi bi-telephone"></i> Call</a>
+        <div style="flex-basis:100%;">
+          ${paymentBlock(p)}
+          ${ratingBlock(p)}
+        </div>
+      </div>`;
+  }
+
   async function openContactPassengers(rideId) {
+    contactPassengersRideId = rideId;
     const sheet = qs('#contactPassengerSheet');
     const list = qs('#contactPassengerList');
     list.innerHTML = '<div class="u-text-center" style="padding:24px 0;"><span class="btn-spinner" style="border-color:rgba(15,139,141,.25);border-top-color:var(--color-primary);width:20px;height:20px;display:inline-block;"></span></div>';
@@ -378,16 +486,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await apiGet('../api/rideshare.php', { action: 'get_passengers', ride_id: rideId });
       const passengers = data?.data?.passengers || [];
-      list.innerHTML = passengers.length ? passengers.map((p) => `
-        <div class="menu-row" style="cursor:default;">
-          <i class="bi bi-person-circle"></i>
-          <span style="flex:1;">
-            <div style="font-weight:600;">${escapeHtml(p.fullname)}</div>
-            <div class="u-text-xs u-text-faint">${escapeHtml(formatPassengerStateLabel(p.passenger_state))}</div>
-          </span>
-          <a href="tel:${escapeHtml(p.phone || '')}" class="btn btn-outline btn-sm" style="width:auto;padding-inline:14px;"><i class="bi bi-telephone"></i> Call</a>
-        </div>
-      `).join('') : '<div class="u-text-center u-text-faint u-text-sm" style="padding:24px 0;">No passengers on this trip.</div>';
+      list.innerHTML = passengers.length
+        ? passengers.map(renderPassengerRow).join('')
+        : '<div class="u-text-center u-text-faint u-text-sm" style="padding:24px 0;">No passengers on this trip.</div>';
     } catch (error) {
       list.innerHTML = '<div class="alert-banner error">Could not load passengers.</div>';
     }
@@ -403,6 +504,70 @@ document.addEventListener('DOMContentLoaded', () => {
     const passengersBtn = e.target.closest('[data-open-passengers]');
     if (passengersBtn) { openContactPassengers(passengersBtn.dataset.openPassengers); return; }
 
+    // P1: confirm a direct (cash) payment — the exact endpoint the driver
+    // dashboard already calls. Reachable here from the Completed tab at any
+    // time, so a stranded PAYMENT_PENDING can always be settled.
+    const confirmPayBtn = e.target.closest('[data-confirm-payment]');
+    if (confirmPayBtn) {
+      setButtonLoading(confirmPayBtn, true, 'Confirming…');
+      try {
+        const data = await apiPost('../api/rideshare.php', { action: 'confirm_direct_payment', booking_id: Number(confirmPayBtn.dataset.confirmPayment) });
+        showToast(data.message || (data.status === 'success' ? 'Payment confirmed' : 'Could not confirm payment'));
+        if (data.status === 'success') {
+          if (typeof refreshWallet === 'function') refreshWallet();
+          await loadAll();
+          if (contactPassengersRideId != null) openContactPassengers(contactPassengersRideId);
+        }
+      } catch (error) { showToast('Something went wrong.'); }
+      finally { setButtonLoading(confirmPayBtn, false); }
+      return;
+    }
+
+    const rejectPayBtn = e.target.closest('[data-reject-payment]');
+    if (rejectPayBtn) {
+      if (!confirm('Mark this cash payment as not received? The passenger will be notified.')) return;
+      setButtonLoading(rejectPayBtn, true, 'Saving…');
+      try {
+        const data = await apiPost('../api/rideshare.php', { action: 'reject_direct_payment', booking_id: Number(rejectPayBtn.dataset.rejectPayment) });
+        showToast(data.message || (data.status === 'success' ? 'Marked as not paid' : 'Could not update payment'));
+        if (data.status === 'success') {
+          await loadAll();
+          if (contactPassengersRideId != null) openContactPassengers(contactPassengersRideId);
+        }
+      } catch (error) { showToast('Something went wrong.'); }
+      finally { setButtonLoading(rejectPayBtn, false); }
+      return;
+    }
+
+    // P5: pick a star rating (visual only) then submit it via rate_passenger.
+    const starBtn = e.target.closest('[data-star-value]');
+    if (starBtn) {
+      const val = Number(starBtn.dataset.starValue);
+      const container = starBtn.closest('[data-rating-input]');
+      if (container) {
+        container.dataset.selected = String(val);
+        container.querySelectorAll('[data-star-value]').forEach((b) => {
+          b.querySelector('i').className = Number(b.dataset.starValue) <= val ? 'bi bi-star-fill' : 'bi bi-star';
+        });
+      }
+      return;
+    }
+
+    const submitRatingBtn = e.target.closest('[data-submit-rating]');
+    if (submitRatingBtn) {
+      const container = submitRatingBtn.closest('[data-rating-input]');
+      const rating = container ? Number(container.dataset.selected || 0) : 0;
+      if (!rating) { showToast('Tap a star to choose a rating first.'); return; }
+      setButtonLoading(submitRatingBtn, true, 'Saving…');
+      try {
+        const data = await apiPost('../api/rideshare.php', { action: 'rate_passenger', booking_id: Number(submitRatingBtn.dataset.submitRating), rating });
+        showToast(data.message || (data.status === 'success' ? 'Rating saved' : 'Could not save rating'));
+        if (data.status === 'success' && contactPassengersRideId != null) openContactPassengers(contactPassengersRideId);
+      } catch (error) { showToast('Something went wrong.'); }
+      finally { setButtonLoading(submitRatingBtn, false); }
+      return;
+    }
+
     const endBtn = e.target.closest('[data-end-trip]');
     if (endBtn) {
       if (!confirm('End this trip now? This settles wallet-paid earnings.')) return;
@@ -413,6 +578,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (data.status === 'success') loadAll();
       } catch (error) { showToast('Something went wrong.'); }
       finally { setButtonLoading(endBtn, false); }
+      return;
+    }
+
+    const arrivedBtn = e.target.closest('[data-arrived-trip]');
+    if (arrivedBtn) {
+      // Private Pickup: driver announces arrival at the pickup point. This
+      // notifies the passenger and moves the trip to PASSENGERS_ASSEMBLED; it
+      // does NOT start the trip (that still needs the passenger's confirm).
+      setButtonLoading(arrivedBtn, true, 'Notifying…');
+      try {
+        const data = await apiPost('../api/private-pickup.php', { action: 'arrived', ride_id: Number(arrivedBtn.dataset.arrivedTrip) });
+        showToast(data.message || (data.status === 'success' ? 'Passenger notified.' : 'Could not mark arrival.'));
+        if (data.status === 'success') loadAll();
+      } catch (error) { showToast('Something went wrong.'); }
+      finally { setButtonLoading(arrivedBtn, false); }
       return;
     }
 
@@ -501,5 +681,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Active trips move fast (GPS-driven) — refresh every 20s so the
   // live card's ETA/GPS-status/passenger count stay current without
   // needing a manual pull-to-refresh gesture this shell doesn't have.
-  setInterval(() => { if (activeTabKey === 'active') loadAll(); }, 20000);
+  // Also refresh Upcoming while a Private Pickup is mid-arrival-handshake,
+  // so the driver's "I've Arrived" / "Start Trip" control flips as soon as
+  // the passenger confirms — without them having to reload.
+  setInterval(() => {
+    if (activeTabKey === 'active') { loadAll(); return; }
+    if (activeTabKey === 'upcoming' && liveTrips.some((r) =>
+      r.ride_mode === 'private' && r.status !== 'in_progress' &&
+      ['PASSENGERS_JOINING', 'PASSENGERS_ASSEMBLED'].includes(r.trip_state))) {
+      loadAll();
+    }
+  }, 20000);
 });

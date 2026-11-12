@@ -253,17 +253,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function msRender(d) {
     const isDriverMode = d.current_mode === 'driver';
-    qs('#msCurrentMode') && (qs('#msCurrentMode').textContent = isDriverMode ? 'Driver' : 'Rider');
+    const isAdminMode = d.current_mode === 'admin';
+    qs('#msCurrentMode') && (qs('#msCurrentMode').textContent = isAdminMode ? 'Admin' : (isDriverMode ? 'Driver' : 'Rider'));
     const detail = isDriverMode && d.vehicle_label ? `${d.vehicle_label} · ${d.driver_ready ? 'verified' : 'verification pending'}` : '';
     qs('#msCurrentDetail') && (qs('#msCurrentDetail').textContent = detail);
 
-    // Rider is always available to a non-admin account; only hide the option
-    // when it is already the current mode.
-    qs('#msRiderSection')?.classList.toggle('u-hidden', !isDriverMode);
+    // Rider stays available to any account; hide only when rider is already the
+    // current mode, so a driver- or admin-mode multi-role account still sees it.
+    qs('#msRiderSection')?.classList.toggle('u-hidden', d.current_mode === 'rider');
     // Driver section for accounts that already hold the capability.
     qs('#msDriverSection')?.classList.toggle('u-hidden', !d.has_driver_capability);
     // Signup path only for riders who have never been a driver.
     qs('#msBecomeSection')?.classList.toggle('u-hidden', !!d.has_driver_capability);
+    // Admin section only for accounts with an active admin hat. The server's
+    // is_admin already folds in admin_status=active + not suspended, so a
+    // suspended admin never sees the option (and the backend re-checks anyway).
+    qs('#msAdminSection')?.classList.toggle('u-hidden', !d.is_admin);
+    msSetDisabled(qs('#msSwitchAdminBtn'), isAdminMode, isAdminMode ? 'Already in Admin mode' : '');
 
     msSetDisabled(qs('#msSwitchDriverBtn'), isDriverMode, isDriverMode ? 'Already in Driver mode' : '');
     const hint = qs('#msDriverHint');
@@ -327,6 +333,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const driverBtn = e.target.closest('#msSwitchDriverBtn');
       if (driverBtn) { msPost({ action: 'switch', mode: 'driver' }, driverBtn); return; }
+
+      const adminBtn = e.target.closest('#msSwitchAdminBtn');
+      if (adminBtn) { msPost({ action: 'switch', mode: 'admin' }, adminBtn); return; }
 
       const classBtn = e.target.closest('[data-ms-class]');
       if (classBtn) { msPost({ action: 'switch', mode: 'driver', vehicle_class: classBtn.dataset.msClass }, classBtn); return; }

@@ -27,9 +27,16 @@ $__msMe = $currentUser ?? [];
     <section class="card u-mb-4" style="padding:var(--space-4);background:var(--color-primary-50);">
         <div class="u-text-xs u-text-faint u-mb-1">Currently using MohToh as</div>
         <div id="msCurrentMode" style="font-family:var(--font-display);font-weight:700;font-size:var(--text-lg);color:var(--color-primary);">
-            <?= ($__msMe['user_type'] ?? 'rider') === 'driver' ? 'Driver' : 'Rider' ?>
+            <?php $__msMode = $__msMe['user_type'] ?? 'rider'; echo $__msMode === 'admin' ? 'Admin' : ($__msMode === 'driver' ? 'Driver' : 'Rider'); ?>
         </div>
         <div class="u-text-xs u-text-faint" id="msCurrentDetail"></div>
+    </section>
+
+    <!-- ================= Admin (multi-role: a rider/driver who is also an admin) ================= -->
+    <section class="u-mb-4 u-hidden" id="msAdminSection">
+        <h3 class="u-text-sm u-mb-2" style="font-weight:700;">Admin</h3>
+        <p class="u-text-xs u-text-faint u-mb-2">Manage the platform. Your rider/driver account, wallet and trip history stay exactly as they are.</p>
+        <button type="button" class="btn btn-primary" id="msSwitchAdminBtn"><i class="bi bi-shield-lock"></i> Switch to Admin</button>
     </section>
 
     <!-- ================= Ride ================= -->

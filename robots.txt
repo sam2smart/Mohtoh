@@ -1,7 +1,11 @@
 User-agent: *
 Disallow: /admin/
 Disallow: /api/
+Disallow: /rider/
+Disallow: /driver/
 Disallow: /verify-account.php
-Disallow: /login.php
+Disallow: /verify-email.php
+Disallow: /reset-password.php
+Disallow: /forgot-password.php
 Allow: /
 Sitemap: https://app.mohtoh.com.ng/sitemap.php

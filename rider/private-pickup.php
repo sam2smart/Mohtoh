@@ -32,6 +32,20 @@ $userType = 'rider';
 // Radius is administratively configurable — read it, never hard-code it,
 // so the copy the rider sees always matches the actual matching rule.
 $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 20);
+
+// Resume a live request across a full reload or tab close — not only via
+// sessionStorage. A pickup can sit in "driver on the way" / "arrived" for
+// minutes, and the arrival confirmation (criterion #11) must stay reachable
+// the whole time, so the page bootstraps the rider's current active request
+// id from the server. The client re-polls its real status from this id.
+$activeReq = $pdo->prepare(
+    "SELECT public_id FROM ride_requests
+     WHERE rider_id = ? AND request_type = 'private_pickup'
+       AND status IN ('pending','accepted','in_progress')
+     ORDER BY id DESC LIMIT 1"
+);
+$activeReq->execute([(int)$_SESSION['user_id']]);
+$activePickupId = (string)($activeReq->fetchColumn() ?: '');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,7 +72,7 @@ $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 2
     <link rel="stylesheet" href="../assets/css/animations.css">
     <link rel="stylesheet" href="../assets/css/responsive.css">
 </head>
-<body data-user-type="rider" data-pickup-radius-km="<?php echo htmlspecialchars((string)$pickupRadiusKm, ENT_QUOTES); ?>">
+<body data-user-type="rider" data-pickup-radius-km="<?php echo htmlspecialchars((string)$pickupRadiusKm, ENT_QUOTES); ?>" data-active-pickup-id="<?php echo htmlspecialchars($activePickupId, ENT_QUOTES); ?>">
 
 <div class="app-shell screen">
     <?php include __DIR__ . '/../partials/app-header.php'; ?>
@@ -103,6 +117,25 @@ $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 2
                     <input type="hidden" id="ppDestinationLng">
                 </div>
 
+                <!-- Vehicle class the passenger wants (criterion #5). Private
+                     Car and Private Keke are separate lanes with separate
+                     pricing; the request is matched only to drivers of the
+                     chosen class. Required before the request can be sent. -->
+                <div class="field-group">
+                    <label class="field-label">Choose your vehicle</label>
+                    <div class="u-flex u-gap-2" id="ppVehicleChoices" role="radiogroup" aria-label="Vehicle type">
+                        <button type="button" class="pp-vehicle-choice card" data-vehicle-type="car" role="radio" aria-checked="false" style="flex:1;padding:var(--space-3);text-align:left;cursor:pointer;border:2px solid transparent;">
+                            <div class="u-flex u-items-center u-gap-2 u-mb-1"><i class="bi bi-car-front-fill" style="color:var(--color-primary);font-size:1.1rem;"></i><span class="u-text-sm u-text-strong">Private Car</span></div>
+                            <div class="u-text-xs u-text-faint" data-vehicle-fare="car">—</div>
+                        </button>
+                        <button type="button" class="pp-vehicle-choice card" data-vehicle-type="keke" role="radio" aria-checked="false" style="flex:1;padding:var(--space-3);text-align:left;cursor:pointer;border:2px solid transparent;">
+                            <div class="u-flex u-items-center u-gap-2 u-mb-1"><i class="bi bi-scooter" style="color:var(--color-primary);font-size:1.1rem;"></i><span class="u-text-sm u-text-strong">Private Keke</span></div>
+                            <div class="u-text-xs u-text-faint" data-vehicle-fare="keke">—</div>
+                        </button>
+                    </div>
+                    <input type="hidden" id="ppVehicleType">
+                </div>
+
                 <div class="field-group">
                     <label class="field-label">Notes for the driver (optional)</label>
                     <textarea id="ppNotes" class="field" style="height:66px;align-items:flex-start;padding-top:12px;" placeholder="Landmark, gate colour, anything that helps them find you"></textarea>
@@ -142,6 +175,35 @@ $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 2
             </div>
         </section>
 
+        <!-- ============ STATE 2b: driver proposed a new fare ============ -->
+        <!-- A matched driver (typically a Keke, whose fare includes the run to
+             your pickup point) proposed a fare different from your opening
+             offer. It is NOT applied until you accept (criterion #3). -->
+        <section id="ppProposalSection" class="u-hidden">
+            <div class="card" style="padding:var(--space-5) var(--space-4);border-left:3px solid var(--color-warning,#E8A33D);">
+                <div class="u-flex u-items-center u-gap-2 u-mb-3">
+                    <i class="bi bi-cash-coin" style="color:var(--color-warning,#E8A33D);font-size:1.4rem;"></i>
+                    <h2 class="u-text-base u-text-strong" style="margin:0;">Driver proposed a fare</h2>
+                </div>
+                <p class="u-text-sm u-text-soft u-mb-3" id="ppProposalDriver">A nearby driver offered to take your pickup.</p>
+                <div class="u-mb-4" style="padding:var(--space-3);background:var(--color-surface-alt,rgba(15,139,141,.06));border-radius:var(--radius-md,10px);">
+                    <div class="u-flex u-justify-between u-items-center u-mb-1">
+                        <span class="u-text-xs u-text-soft">Your offer</span>
+                        <span class="u-text-sm" id="ppProposalOffer" style="text-decoration:line-through;opacity:.7;">—</span>
+                    </div>
+                    <div class="u-flex u-justify-between u-items-center">
+                        <span class="u-text-sm u-text-strong">Driver's fare</span>
+                        <span class="u-text-lg u-text-strong" id="ppProposalFare" style="color:var(--color-primary);">—</span>
+                    </div>
+                    <div class="u-text-xs u-text-faint u-mt-2" id="ppProposalNote"></div>
+                </div>
+                <div class="u-flex u-gap-2">
+                    <button type="button" class="btn btn-primary" style="width:auto;flex:1;" id="ppAcceptFareBtn">Accept fare</button>
+                    <button type="button" class="btn btn-outline" style="width:auto;flex:1;" id="ppRejectFareBtn">Decline</button>
+                </div>
+            </div>
+        </section>
+
         <!-- ============ STATE 3: driver found ============ -->
         <section id="ppFoundSection" class="u-hidden">
             <div class="card" style="padding:var(--space-5) var(--space-4);border-left:3px solid var(--color-success,#1B998B);">
@@ -150,10 +212,33 @@ $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 2
                     <h2 class="u-text-base u-text-strong" style="margin:0;">Driver found</h2>
                 </div>
                 <p class="u-text-sm u-text-soft u-mb-3">Your driver accepted and is on the way to your pickup point. Their vehicle is shown below.</p>
+
+                <!-- Agreed fare, shown prominently and identical to the driver's
+                     number (criteria #2/#6). This is THE price for the trip. -->
+                <div class="u-flex u-justify-between u-items-center u-mb-3" style="padding:var(--space-3);background:rgba(27,153,139,.10);border-radius:var(--radius-md,10px);">
+                    <span class="u-text-sm u-text-strong"><i class="bi bi-check-circle-fill" style="color:var(--color-success,#1B998B);"></i> Agreed fare</span>
+                    <span class="u-text-lg u-text-strong" id="ppAgreedFare" style="color:var(--color-primary);">—</span>
+                </div>
+
                 <div class="u-mb-4" style="padding:var(--space-3);background:var(--color-surface-alt,rgba(15,139,141,.06));border-radius:var(--radius-md,10px);">
                     <div class="u-text-sm u-text-strong" id="ppDriverName">—</div>
                     <div class="u-text-xs u-text-soft u-mt-1" id="ppDriverMeta"></div>
                 </div>
+
+                <!-- Arrival confirmation (criteria #11/#12). Shown only once the
+                     driver marks arrival; confirming here is what lets the
+                     driver start the trip - the backend refuses to start until
+                     this is done. -->
+                <div id="ppArrivalBlock" class="u-hidden u-mb-4" style="padding:var(--space-3);background:rgba(232,163,61,.10);border-radius:var(--radius-md,10px);">
+                    <div class="u-text-sm u-text-strong u-mb-1"><i class="bi bi-geo-alt-fill" style="color:var(--color-warning,#E8A33D);"></i> Your driver says they've arrived</div>
+                    <p class="u-text-xs u-text-soft u-mb-3">Confirm only when you can see your driver at the pickup point. Your driver cannot start the trip until you confirm.</p>
+                    <button type="button" class="btn btn-primary btn-sm" id="ppConfirmArrivalBtn">Confirm my driver has arrived</button>
+                </div>
+                <div id="ppArrivalConfirmed" class="u-hidden u-mb-4" style="padding:var(--space-3);background:rgba(27,153,139,.10);border-radius:var(--radius-md,10px);">
+                    <div class="u-text-sm u-text-strong"><i class="bi bi-check-circle-fill" style="color:var(--color-success,#1B998B);"></i> Arrival confirmed</div>
+                    <p class="u-text-xs u-text-soft" style="margin:4px 0 0;">Your driver can now start the trip.</p>
+                </div>
+
                 <a class="btn btn-primary" id="ppOpenTripBtn" href="trips.php"><i class="bi bi-geo"></i> Track my trip</a>
             </div>
         </section>

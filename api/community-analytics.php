@@ -6,10 +6,9 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-// Only allow admin
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+// Access-Control: community analytics are read-only reports -> reports.view.
+require_once '../includes/admin_permissions.php';
+require_admin_permission($pdo, 'reports.view');
 
 $action = $_GET['action'] ?? '';
 

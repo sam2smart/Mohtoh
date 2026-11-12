@@ -13,10 +13,11 @@
 // drivers, rider/private-pickup.php for riders. It previously pointed at
 // a bare "pickup.php" from the RIDER branch only, which 404'd for riders
 // and left drivers with no route to Private Pickup at all.
-// Grow My Community is the single canonical
-// entry point to MohToh Community Rewards (partials/
-// community-rewards-sheet.php, included on every page this drawer is) —
-// do not add a second entry point (e.g. a dashboard card) elsewhere.
+// MOHTOH NETWORK is the single canonical entry point to the direct-
+// referral/revenue-share programme (partials/network-sheet.php,
+// included on every page this drawer is) — supersedes the old "Grow My
+// Community" link to MohToh Community Rewards. Do not add a second
+// entry point (e.g. a dashboard card) elsewhere.
 // $currentUser (fullname, user_type, profile_image) is provided by
 // includes/current_user.php, which the including page loads before
 // this partial. Fall back gracefully if a page hasn't wired it in yet.
@@ -27,8 +28,13 @@ $__userType = $__me['user_type'];
 // still has the capability, so they get "Switch to Driver" rather than being
 // asked to sign up again.
 $__hasDriverCapability = !empty($__me['has_driver_capability']) || $__userType === 'driver';
+// Admin CAPABILITY (additive, from current_user.php). A rider/driver who is
+// also an admin with an active hat gets a "Switch to Admin" entry that opens
+// the same mode-switch sheet; switch-mode.php re-checks the capability server-
+// side, so showing/hiding this link is purely cosmetic.
+$__hasAdminCapability = !empty($__me['is_admin']) && (($__me['admin_status'] ?? 'active') === 'active');
 $__avatarSrc = $__me['profile_image']
-    ? '../uploads/' . rawurlencode($__me['profile_image'])
+    ? '../img.php?f=' . rawurlencode($__me['profile_image']) . '&w=160'
     : 'https://ui-avatars.com/api/?name=' . urlencode($__me['fullname']) . '&background=0F8B8D&color=fff';
 ?>
 <div class="sheet-scrim" id="sidebarScrim"></div>
@@ -62,7 +68,10 @@ $__avatarSrc = $__me['profile_image']
         <?php else: ?>
         <a href="#" data-open-sheet-id="modeSwitchSheet"><i class="bi bi-car-front"></i>Become a Driver</a>
         <?php endif; ?>
-        <a href="#" data-open-sheet-id="communityRewardsSheet" id="sidebarGrowCommunityLink"><i class="bi bi-people-fill"></i>Grow My Community</a>
+        <?php if ($__hasAdminCapability): ?>
+        <a href="#" data-open-sheet-id="modeSwitchSheet"><i class="bi bi-shield-lock"></i>Switch to Admin</a>
+        <?php endif; ?>
+        <a href="#" data-open-sheet-id="networkSheet" id="sidebarNetworkLink"><i class="bi bi-share-fill"></i>MOHTOH NETWORK</a>
         <a href="ride-requests.php"><i class="bi bi-signpost"></i>Ride Requests</a>
         <a href="profile.php?open=settings"><i class="bi bi-gear"></i>Settings</a>
         <a href="mailto:support@meritdrives.com"><i class="bi bi-life-preserver"></i>Support</a>

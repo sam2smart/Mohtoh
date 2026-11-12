@@ -15,6 +15,10 @@ require_once __DIR__ . '/../includes/referral.php';
 // normalize_vehicle_type() + sync_keke_classification() own the keke
 // classification invariant used by driver registration below.
 require_once __DIR__ . '/../includes/eligibility.php';
+// Social login: lets a successful PASSWORD login finish a pending
+// "connect your Google/Facebook account" link (ownership proof). Adds no new
+// behaviour to email/password auth on its own.
+require_once __DIR__ . '/../includes/oauth.php';
 
 header('Content-Type: application/json');
 
@@ -165,16 +169,14 @@ if ($action === 'register') {
             send_phone_otp($pdo, $user_id);
         }
 
-        // MohToh Community Rewards — link the relationship if a valid,
-        // non-self-referential code was supplied. Never blocks or fails
-        // registration itself; create_referral_relationship() returns an
+        // MOHTOH NETWORK — link the relationship if a valid, approved
+        // Network Partner code was supplied. Never blocks or fails
+        // registration itself; network_attribute_referral() returns an
         // ['error'=>...] array rather than throwing for any invalid case.
         if ($referral_code !== '') {
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE referral_code = ?");
-            $stmt->execute([$referral_code]);
-            $referrerId = $stmt->fetchColumn();
-            if ($referrerId) {
-                create_referral_relationship($pdo, (int)$referrerId, (int)$user_id, strtoupper($user_type));
+            $partner = get_network_partner_by_code($pdo, $referral_code);
+            if ($partner && $partner['status'] === 'approved') {
+                network_attribute_referral($pdo, (int)$partner['user_id'], (int)$user_id, $user_type);
             }
         }
 
@@ -234,7 +236,11 @@ if ($action === 'register') {
     $_SESSION['fullname'] = $user['fullname'];
     $_SESSION['public_user_id'] = $user['user_id'];
 
-    // Registration Policy (Admin -> System Settings -> Service Integration
+    // Social login (additive): if the user arrived here because a provider's
+    // VERIFIED email matched this account, the password they just proved is the
+    // ownership proof, so connect the pending Google/Facebook identity now.
+    // No-op for ordinary logins (returns null when nothing is pending).
+    oauth_complete_pending_link($pdo, (int)$user['id'], (string)($user['email'] ?? ''));
     // Center -> Registration Policy) — DB-configured, falling back to the
     // includes/config.php constants for installs that never touch the UI.
     $requireEmailToLogin = get_integration_setting_bool($pdo, 'integration_require_email_to_login', defined('REQUIRE_EMAIL_VERIFIED_TO_LOGIN') ? REQUIRE_EMAIL_VERIFIED_TO_LOGIN : true);

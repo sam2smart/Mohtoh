@@ -13,6 +13,7 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/audit.php';
+require_once '../includes/admin_permissions.php'; // admin RBAC gates (require_admin_permission / require_admin_access)
 
 header('Content-Type: application/json');
 
@@ -110,18 +111,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     // Admin: catalog management list (includes inactive features).
     if ($action === 'features') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Admin catalog view -> premium.view (read-only, grantable).
+        require_admin_permission($pdo, 'premium.view');
         $rows = $pdo->query("SELECT * FROM driver_premium_features ORDER BY feature_name ASC")->fetchAll();
         json_response('success', 'Features fetched', ['features' => $rows]);
     }
 
     // Admin: request queue with filters/pagination (Part 3/5).
     if ($action === 'admin_list') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Admin request-queue view -> premium.view (read-only, grantable).
+        require_admin_permission($pdo, 'premium.view');
         [$page, $limit, $offset] = paginate_params();
         $where = ['1=1'];
         $params = [];
@@ -198,9 +197,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (in_array($action, ['approve', 'reject', 'disable', 'delete_request'], true)) {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Money/entitlement actions are Super-Admin-only. require_admin_access
+        // first enforces admin mode + active + not suspended (rejecting a
+        // suspended or non-admin-mode super), then require_super_admin confirms
+        // the Super hat. No Subadmin permission can ever reach these.
+        require_admin_access($pdo);
+        require_super_admin($pdo);
         $requestPublicId = $input['request_public_id'] ?? '';
         if ($requestPublicId === '') {
             json_response('error', 'request_public_id is required');
@@ -328,9 +330,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Admin catalog management (create/update/toggle a feature).
     if ($action === 'save_feature') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Catalog write (price/duration) -> Super-Admin-only, same tier as the
+        // approve/reject/disable/delete_request money actions above.
+        require_admin_access($pdo);
+        require_super_admin($pdo);
         $featureId = (int)($input['id'] ?? 0);
         $name = trim((string)($input['feature_name'] ?? ''));
         $description = trim((string)($input['description'] ?? ''));

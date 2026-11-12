@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     resultsList.innerHTML = ranked.map((ride) => {
       const driverImage = ride.driver_image && ride.driver_image !== 'default.png'
-        ? `../uploads/${ride.driver_image}`
+        ? `../img.php?f=${encodeURIComponent(ride.driver_image)}&w=160`
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(ride.driver_name)}&background=0F8B8D&color=fff`;
 
       if (ride._full) {
@@ -210,9 +210,18 @@ document.addEventListener('DOMContentLoaded', () => {
       is_verified: !!ride.driver_verified
     };
 
+    // What the rider will actually be able to pay with, straight from the
+    // ride's configured payment_preference (never hard-coded). 'both' means
+    // the rider chooses below; the single-method rides state it plainly.
+    const paymentLabel = ride.payment_preference === 'direct'
+      ? 'Direct / Cash to driver'
+      : ride.payment_preference === 'both'
+        ? 'Wallet or Direct / Cash — your choice'
+        : 'Wallet';
+
     detailContent.innerHTML = `
       ${TransparencyUI.renderDriverProfileCard(driver)}
-      
+
       <div class="card p-3 mb-3">
         <h6 class="mb-2">Vehicle Information</h6>
         <div class="u-text-sm u-text-soft u-mb-2">${escapeHtml(ride.vehicle_make)} ${escapeHtml(ride.vehicle_model)} · ${escapeHtml(ride.vehicle_color)}</div>
@@ -229,6 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="u-text-sm"><strong>Route:</strong> ${escapeHtml(ride.start_location)} → ${escapeHtml(ride.destination)}</div>
         <div class="u-text-sm"><strong>Seats available:</strong> ${ride.available_seats}</div>
         <div class="u-text-sm"><strong>Fare:</strong> ₦${Number(ride.price_per_passenger).toLocaleString()}</div>
+        <div class="u-text-sm"><strong>Payment:</strong> ${paymentLabel}</div>
       </div>
     `;
 
@@ -241,7 +251,18 @@ document.addEventListener('DOMContentLoaded', () => {
       detailFooter.innerHTML = `<button class="btn btn-primary" disabled><i class="bi bi-check-circle-fill"></i> Already joined</button>`;
     } else if (ride.remaining_seats > 0 && ride.status === 'active') {
       const total = (1 * parseFloat(ride.price_per_passenger)).toFixed(2);
+      // Only "both" rides give the rider a choice; single-method rides use
+      // their fixed method (selectedPaymentMethod set above) with no toggle.
+      const paymentChoiceMarkup = ride.payment_preference === 'both' ? `
+        <div class="u-mb-3">
+          <div class="u-text-xs u-text-soft u-mb-2">How would you like to pay?</div>
+          <div id="paymentMethodChoice" class="u-flex u-gap-2">
+            <button type="button" class="btn btn-outline btn-sm is-active" data-pay-method="wallet" style="flex:1;"><i class="bi bi-wallet2"></i> Wallet</button>
+            <button type="button" class="btn btn-outline btn-sm" data-pay-method="direct" style="flex:1;"><i class="bi bi-cash-coin"></i> Direct / Cash</button>
+          </div>
+        </div>` : '';
       detailFooter.innerHTML = `
+        ${paymentChoiceMarkup}
         <div class="u-flex u-gap-3 u-items-center">
           <div class="field" style="width:96px;padding:8px 10px;">
             <input type="number" id="seatsToBook" value="1" min="1" max="${ride.remaining_seats}">

@@ -326,8 +326,68 @@ try {
         $driver_id = (int)$_SESSION['user_id'];
         $today = date('Y-m-d');
 
+        // ---------------------------------------------------------------
+        // Lazy auto-expiry: cancel any rides for this driver whose
+        // departure_date has already passed but are still active/full.
+        // This mirrors the pattern used by ride_demand_requests — no cron
+        // runner is needed; it fires opportunistically at read time.
+        // ---------------------------------------------------------------
+        $expiredRideStmt = $pdo->prepare("
+            SELECT id, public_id, start_location, destination, price_per_passenger
+            FROM ride_shares
+            WHERE driver_id = ? AND status IN ('active', 'full') AND departure_date < ?
+        ");
+        $expiredRideStmt->execute([$driver_id, $today]);
+        $expiredRides = $expiredRideStmt->fetchAll();
+
+        foreach ($expiredRides as $expRide) {
+            $expRideId = (int)$expRide['id'];
+            try {
+                $pdo->beginTransaction();
+
+                // Cancel active bookings and refund wallet payments.
+                $bStmt = $pdo->prepare("SELECT id, rider_id, seats_booked, payment_method FROM ride_share_bookings WHERE ride_share_id = ? AND status NOT IN ('cancelled', 'completed') FOR UPDATE");
+                $bStmt->execute([$expRideId]);
+                $bkgs = $bStmt->fetchAll();
+                foreach ($bkgs as $bkg) {
+                    if ($bkg['payment_method'] === 'wallet') {
+                        $refund = (float)$expRide['price_per_passenger'] * (int)$bkg['seats_booked'];
+                        // Only refund if a PAYMENT_CONFIRMED record exists (wallet was actually debited).
+                        $pmtStmt = $pdo->prepare("SELECT id FROM payments WHERE booking_id = ? AND status = 'PAYMENT_CONFIRMED' LIMIT 1");
+                        $pmtStmt->execute([$bkg['id']]);
+                        if ($pmtStmt->fetchColumn()) {
+                            require_once '../includes/wallet.php';
+                            credit_wallet($pdo, (int)$bkg['rider_id'], $refund, 'ride_refund', "Refund: ride {$expRide['public_id']} auto-cancelled (departure date passed)");
+                            $pdo->prepare("UPDATE payments SET status = 'REFUNDED' WHERE booking_id = ?")->execute([$bkg['id']]);
+                        }
+                    }
+                    $pdo->prepare("UPDATE ride_share_bookings SET status = 'cancelled', updated_at = NOW() WHERE id = ?")->execute([$bkg['id']]);
+                    create_notification($pdo, (int)$bkg['rider_id'], [
+                        'title' => 'Ride cancelled — departure date passed',
+                        'message' => "The ride from {$expRide['start_location']} to {$expRide['destination']} was automatically cancelled because the departure date has passed." . ($bkg['payment_method'] === 'wallet' ? ' Your payment has been refunded.' : ''),
+                        'notification_type' => 'ride',
+                    ]);
+                }
+
+                // Release commission reservation (same function used by the manual cancel action).
+                release_ride_reservation($pdo, $expRideId);
+
+                // Mark ride cancelled and record the state transition.
+                $pdo->prepare("UPDATE ride_shares SET status = 'cancelled', updated_at = NOW() WHERE id = ?")->execute([$expRideId]);
+                transition_trip_state($pdo, $expRideId, 'CANCELLED', 'AUTO_EXPIRED');
+
+                // Reset any MATCHED passenger demand requests.
+                $pdo->prepare("UPDATE ride_demand_requests SET status = 'OPEN', matched_ride_id = NULL, updated_at = NOW() WHERE matched_ride_id = ? AND status = 'MATCHED'")->execute([$expRideId]);
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                // Non-fatal: stale ride stays as-is until next attempt.
+            }
+        }
+
         $stmt = $pdo->prepare("
-            SELECT rs.id, rs.public_id, rs.start_location, rs.destination, rs.departure_date, rs.departure_time, rs.total_seats, rs.available_seats, rs.price_per_passenger, rs.description, rs.vehicle_type, rs.vehicle_info, rs.status, rs.trip_state, rs.ride_mode, rs.current_latitude, rs.current_longitude, rs.last_location_update, rs.pickup_lat, rs.pickup_lng, rs.destination_lat, rs.destination_lng,
+            SELECT rs.id, rs.public_id, rs.start_location, rs.destination, rs.departure_date, rs.departure_time, rs.total_seats, rs.available_seats, rs.price_per_passenger, rs.description, rs.vehicle_type, rs.vehicle_info, rs.status, rs.trip_state, rs.ride_mode, rs.passenger_arrival_confirmed_at, rs.current_latitude, rs.current_longitude, rs.last_location_update, rs.pickup_lat, rs.pickup_lng, rs.destination_lat, rs.destination_lng,
                    (SELECT COUNT(*) FROM ride_share_bookings rb WHERE rb.ride_share_id = rs.id AND rb.status != 'cancelled') AS passengers_joined,
                    (SELECT COUNT(*) FROM ride_waitlists rw WHERE rw.ride_share_id = rs.id AND rw.status IN ('WAITING', 'NOTIFIED')) AS waiting_count,
                    cr.reserved_amount, cr.used_amount, cr.released_amount, cr.status AS reservation_status
@@ -518,6 +578,11 @@ try {
             transition_trip_state($pdo, $ride_id, 'CANCELLED', 'MANUAL_DRIVER_ACTION');
             release_ride_reservation($pdo, $ride_id);
 
+            // Bug fix: Reset matched passenger ride requests back to OPEN
+            // so they can be matched again by other drivers.
+            $stmt = $pdo->prepare("UPDATE ride_demand_requests SET status = 'OPEN', matched_ride_id = NULL, updated_at = NOW() WHERE matched_ride_id = ? AND status = 'MATCHED'");
+            $stmt->execute([$ride_id]);
+
             $pdo->commit();
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
@@ -549,15 +614,16 @@ try {
         }
 
         $stmt = $pdo->prepare("
-            SELECT u.fullname, u.phone, u.profile_image, rb.id AS booking_id, rb.seats_booked, rb.status, rb.payment_method, p.status AS payment_status,
+            SELECT u.fullname, u.phone, u.profile_image, rb.id AS booking_id, rb.rider_id, rb.seats_booked, rb.status, rb.payment_method, p.status AS payment_status,
                    rb.passenger_state, rb.last_confidence_score, rb.no_show_deadline,
-                   (rb.no_show_deadline IS NOT NULL AND rb.no_show_deadline < NOW() AND rb.passenger_state IN ('booked', 'navigating', 'arrived')) AS no_show_pending
+                   (rb.no_show_deadline IS NOT NULL AND rb.no_show_deadline < NOW() AND rb.passenger_state IN ('booked', 'navigating', 'arrived')) AS no_show_pending,
+                   (SELECT prr.rating FROM ride_share_passenger_ratings prr WHERE prr.booking_id = rb.id AND prr.driver_id = ?) AS driver_rating
             FROM ride_share_bookings rb
             JOIN users u ON rb.rider_id = u.id
             LEFT JOIN payments p ON p.booking_id = rb.id
             WHERE rb.ride_share_id = ? AND rb.status NOT IN ('cancelled')
         ");
-        $stmt->execute([$ride_id]);
+        $stmt->execute([$_SESSION['user_id'], $ride_id]);
         $passengers = $stmt->fetchAll();
 
         $summary = [
@@ -716,6 +782,16 @@ try {
             json_response('error', 'Ride ID is required');
         }
 
+        // Surface the exact Private Pickup arrival-gate message (criterion #12)
+        // when that is the reason a start is refused. mark_ride_started()
+        // enforces the same gate regardless (it is the single chokepoint), so
+        // this only improves the message the driver sees; it can never be the
+        // thing that lets a start through. No-op for Join Ride trips.
+        $block = private_pickup_start_block_reason($pdo, $ride_id);
+        if ($block !== null) {
+            json_response('error', $block);
+        }
+
         if (mark_ride_started($pdo, $ride_id, $_SESSION['user_id'], 'MANUAL_DRIVER_ACTION')) {
             json_response('success', 'Ride started successfully');
         } else {
@@ -759,6 +835,19 @@ try {
 
             // Release vehicle reservation on completion
             $pdo->prepare("UPDATE ride_shares SET vehicle_reserved = 0 WHERE id = ?")
+                ->execute([$ride_id]);
+
+            // Private Pickup: close the originating request so a completed trip
+            // stops counting against the rider's "one active pickup request at a
+            // time" guard (includes/private_pickup.php:60). The accept handler
+            // moves the request to 'in_progress' but nothing ever advanced it to
+            // a terminal state on completion, so it was stranded at 'in_progress'
+            // forever and every future create() was rejected with "You already
+            // have an active pickup request." — permanently locking a rider to a
+            // single lifetime pickup. Scoped to the linked private_pickup request
+            // only; Join Ride bookings have no ride_requests row, so this is a
+            // no-op for them and cannot affect the Join Ride lane.
+            $pdo->prepare("UPDATE ride_requests SET status = 'completed' WHERE matched_ride_share_id = ? AND request_type = 'private_pickup' AND status IN ('accepted','in_progress')")
                 ->execute([$ride_id]);
 
             transition_trip_state($pdo, $ride_id, 'TRIP_COMPLETED', 'MANUAL_DRIVER_ACTION');
@@ -829,6 +918,18 @@ try {
             $stmt->execute([$payment['id']]);
 
             $pdo->commit();
+
+            // MOHTOH NETWORK: a direct-paid booking only becomes a
+            // qualifying transaction once BOTH the trip is completed
+            // AND the driver confirms the cash arrived — this is that
+            // second condition finally being met. Idempotent; never
+            // allowed to affect the payment confirmation above.
+            try {
+                network_settle_booking_reward($pdo, $booking_id);
+            } catch (Throwable $e) {
+                error_log('MOHTOH NETWORK settlement failed for booking #' . $booking_id . ': ' . $e->getMessage());
+            }
+
             json_response('success', 'Direct payment confirmed and commission settled.');
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
@@ -910,9 +1011,18 @@ try {
     }
 
     if ($action === 'details') {
-        $ride_id = (int)($input['ride_id'] ?? $_GET['ride_id'] ?? 0);
+        $ride_id    = (int)($input['ride_id']   ?? $_GET['ride_id']   ?? 0);
+        $public_id  = sanitize_input($input['public_id'] ?? $_GET['public_id'] ?? '');
+
+        // Support share-link deep-link: caller may pass only public_id.
+        if ($ride_id <= 0 && $public_id !== '') {
+            $pid_stmt = $pdo->prepare("SELECT id FROM ride_shares WHERE public_id = ? LIMIT 1");
+            $pid_stmt->execute([$public_id]);
+            $ride_id = (int)($pid_stmt->fetchColumn() ?: 0);
+        }
+
         if ($ride_id <= 0) {
-            json_response('error', 'Ride ID is required');
+            json_response('error', 'Ride ID or public ID is required');
         }
 
         $stmt = $pdo->prepare("
@@ -1224,6 +1334,64 @@ try {
             }
 
             json_response('success', 'Thank you for your feedback!');
+
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            json_response('error', $e->getMessage());
+        }
+    }
+
+    // Driver -> passenger rating for a completed Join Ride. Symmetric twin of
+    // rate_ride, keyed on the same booking relationship. Writes only to the
+    // dedicated ride_share_passenger_ratings table; it deliberately does NOT
+    // touch users.rating (that column is the DRIVER rating aggregate — a rider
+    // being rated here may also be a driver, so writing it would clobber their
+    // driver score). Rider-scoped authorization: the driver may only rate a
+    // passenger on a completed ride they own.
+    if ($action === 'rate_passenger' && $_SESSION['user_type'] === 'driver') {
+        $booking_id = (int)($input['booking_id'] ?? 0);
+        $rating = (int)($input['rating'] ?? 0);
+        $comment = sanitize_input($input['comment'] ?? '');
+
+        if ($booking_id <= 0 || $rating < 1 || $rating > 5) {
+            json_response('error', 'Valid booking ID and a rating between 1 and 5 are required.');
+        }
+
+        $driver_id = $_SESSION['user_id'];
+
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare("SELECT b.ride_share_id, b.rider_id FROM ride_share_bookings b JOIN ride_shares rs ON b.ride_share_id = rs.id WHERE b.id = ? AND rs.driver_id = ? AND b.status = 'completed'");
+            $stmt->execute([$booking_id, $driver_id]);
+            $booking = $stmt->fetch();
+
+            if (!$booking) {
+                throw new Exception('This passenger cannot be rated. The ride might not be completed or is not one of yours.');
+            }
+
+            $stmt = $pdo->prepare("SELECT id FROM ride_share_passenger_ratings WHERE booking_id = ? AND driver_id = ?");
+            $stmt->execute([$booking_id, $driver_id]);
+            if ($stmt->fetch()) {
+                throw new Exception('You have already rated this passenger.');
+            }
+
+            $rating_public_id = generate_unique_public_id($pdo, 'ride_share_passenger_ratings', 'public_id', 'PRATING');
+            $stmt = $pdo->prepare("INSERT INTO ride_share_passenger_ratings (public_id, ride_share_id, booking_id, driver_id, rider_id, rating, comment) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$rating_public_id, $booking['ride_share_id'], $booking_id, $driver_id, $booking['rider_id'], $rating, $comment]);
+
+            $pdo->commit();
+
+            // Notify the rated passenger (gated on their notification preference).
+            $stmt = $pdo->prepare("SELECT notify_on_rating FROM users WHERE id = ?");
+            $stmt->execute([$booking['rider_id']]);
+            if ($stmt->fetchColumn()) {
+                $notification_message = "Your driver gave you a {$rating}-star rating for a recent ride.";
+                notify_user($pdo, $booking['rider_id'], $notification_message, 'trips.php?tab=completed');
+            }
+
+            json_response('success', 'Thank you for rating your passenger!');
 
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {

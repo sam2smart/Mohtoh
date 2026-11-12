@@ -13,9 +13,11 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in()) {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: this GET was previously open to ANY logged-in user — now it
+// requires an active admin with reports.view. The POST writes below keep their
+// own require_super_admin($pdo) gate (money-affecting reward config).
+require_admin_permission($pdo, 'reports.view');
 
 const REFERRAL_SETTING_KEYS = [
     'referral_system_enabled',

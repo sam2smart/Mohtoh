@@ -10,7 +10,7 @@ function mt_render_seo($title, $description, $canonical = '', $isIndexable = tru
     $baseUrl = rtrim(mt_get_base_url(), '/');
     $canonicalUrl = $canonical ? $canonical : ($baseUrl . $_SERVER['REQUEST_URI']);
     $robots = $isIndexable ? 'index, follow' : 'noindex, nofollow';
-    $ogImage = $ogImage ? $ogImage : ($baseUrl . '/assets/images/og-default.jpg');
+    $ogImage = $ogImage ? $ogImage : ($baseUrl . '/assets/images/favicon-32.png');
 
     echo "<title>" . htmlspecialchars($title) . " | MohToh</title>\n";
     echo "<meta name=\"description\" content=\"" . htmlspecialchars($description) . "\">\n";
@@ -19,10 +19,14 @@ function mt_render_seo($title, $description, $canonical = '', $isIndexable = tru
 
     // Social Meta
     echo "<meta property=\"og:title\" content=\"" . htmlspecialchars($title) . "\">\n";
+    echo "<meta property=\"og:type\" content=\"website\">\n";
     echo "<meta property=\"og:description\" content=\"" . htmlspecialchars($description) . "\">\n";
     echo "<meta property=\"og:url\" content=\"" . htmlspecialchars($canonicalUrl) . "\">\n";
     echo "<meta property=\"og:image\" content=\"" . htmlspecialchars($ogImage) . "\">\n";
     echo "<meta name=\"twitter:card\" content=\"summary_large_image\">\n";
+    echo "<meta name=\"twitter:title\" content=\"" . htmlspecialchars($title) . "\">\n";
+    echo "<meta name=\"twitter:description\" content=\"" . htmlspecialchars($description) . "\">\n";
+    echo "<meta name=\"twitter:image\" content=\"" . htmlspecialchars($ogImage) . "\">\n";
 
     // Structured Data
     if (!empty($structuredData)) {
@@ -36,7 +40,7 @@ function mt_get_structured_data_organization() {
         "@type" => "Organization",
         "name" => "MohToh",
         "url" => mt_get_base_url(),
-        "logo" => mt_get_base_url() . "/assets/images/logo.png"
+        "logo" => mt_get_base_url() . "/assets/images/favicon-32.png"
     ];
 }
 

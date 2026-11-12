@@ -14,9 +14,10 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: targeted driver messaging is the announcements.send
+// permission (same as broadcast comms). Full chain enforced here.
+require_admin_permission($pdo, 'announcements.send');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);

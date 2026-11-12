@@ -14,6 +14,7 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/ride_queue.php';
+require_once '../includes/admin_permissions.php'; // admin RBAC gates (require_admin_permission)
 
 header('Content-Type: application/json');
 
@@ -42,9 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Distinct from 'ride_queue' below, which is scoped to one ride and
     // shared with the driver's (count-only) view.
     if ($action === 'admin_overview') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Admin queue overview -> rides.view. The per-ride 'ride_queue' read
+        // below stays shared (owning driver / admin) and is intentionally
+        // NOT gated here — it is not an admin-only surface.
+        require_admin_permission($pdo, 'rides.view');
 
         $where = ['1=1'];
         $params = [];

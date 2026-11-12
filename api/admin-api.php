@@ -7,6 +7,9 @@ require_once '../includes/config.php';
 require_once '../includes/verification.php';
 require_once '../includes/audit.php';
 require_once '../includes/referral.php';
+// Admin Access-Control: per-action permission enforcement (Subadmins) on
+// top of the raw admin gate. Super Admins bypass every permission check.
+require_once '../includes/admin_permissions.php';
 // Canonical vehicle-type and verification-document vocabulary, shared with
 // the driver side so admin review labels a keke as a keke.
 require_once '../includes/eligibility.php';
@@ -35,7 +38,7 @@ function ensure_mohtoh_admin_columns($pdo) {
 }
 
 function fetch_user_review_profile($pdo, $user_id) {
-    $stmt = $pdo->prepare("SELECT id, user_id, fullname, phone, email, user_type, rating, completed_rides, is_online, created_at FROM users WHERE id = ? AND user_type IN ('driver', 'rider')");
+    $stmt = $pdo->prepare("SELECT id, user_id, fullname, phone, email, user_type, rating, completed_rides, is_online, profile_image, created_at FROM users WHERE id = ? AND user_type IN ('driver', 'rider')");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch();
     if (!$user) {
@@ -213,10 +216,12 @@ function fetch_user_review_profile($pdo, $user_id) {
     ];
 }
 
-// Ensure user is logged in and is an admin
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized access');
-}
+// Ensure user is logged in and is an admin.
+// require_admin_access() enforces the full chain server-side: authenticated
+// -> admin capability (is_admin) -> admin_status='active' -> not suspended,
+// re-read from the DB every request. A Subadmin passes this gate; the two
+// per-action permission choke points below then scope WHAT they may do.
+require_admin_access($pdo);
 
 ensure_mohtoh_admin_columns($pdo);
 
@@ -231,12 +236,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $post_action = $input['action'] ?? '';
 
+    // Permission choke point (fail-closed). Every mutating POST action is
+    // mapped in ADMIN_API_POST_PERMS; an unmapped action resolves to the
+    // '__deny__' sentinel — denied for Subadmins, bypassed by Super Admins
+    // (who reach the handler, which errors on its own if the action is a
+    // retired stub). Keyed off $post_action, NOT the internal $action var
+    // (approve_vehicle reassigns $action as a log label).
+    require_admin_permission($pdo, ADMIN_API_POST_PERMS[$post_action] ?? '__deny__');
+
     if ($post_action === 'update_settings') {
         // Retired in favor of the consolidated, super-admin-gated,
         // audit-logged api/pricing-admin.php (settings.commission_percentage).
         json_response('error', 'This action has moved to api/pricing-admin.php.');
 
     } elseif ($post_action === 'delete_user') {
+        // Super-Admin-only (also enforced by the '__deny__'-class mapping in
+        // ADMIN_API_POST_PERMS). Second, independent layer so this can never
+        // be reached by a Subadmin even if the choke point were bypassed.
+        require_super_admin($pdo);
         $user_id = (int)($input['user_id'] ?? 0);
         if ($user_id <= 0) {
             json_response('error', 'Invalid user ID');
@@ -247,8 +264,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_response('error', 'You cannot delete your own admin account');
         }
 
+        // Refuse to delete any admin/super account here: users.id is the FK
+        // parent for admin_permissions (ON DELETE CASCADE) and the audit
+        // trail references it — removing an admin this way would silently
+        // wipe grants and bypass the "never remove the last Super Admin"
+        // guard. Admin removal is a deliberate management operation, not a
+        // generic user delete.
+        $stmt = $pdo->prepare("SELECT is_admin, is_super_admin FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $targetFlags = $stmt->fetch();
+        if ($targetFlags && ((int)$targetFlags['is_admin'] === 1 || (int)$targetFlags['is_super_admin'] === 1)) {
+            json_response('error', 'Admin accounts cannot be deleted here. Manage them under Administrators.');
+        }
+
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         if ($stmt->execute([$user_id])) {
+            log_admin_action($pdo, (int)$_SESSION['user_id'], 'delete', 'user', $user_id, null, null, $input['reason'] ?? null);
             json_response('success', 'User deleted successfully');
         } else {
             json_response('error', 'Failed to delete user');
@@ -891,6 +922,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Handling GET requests (Fetch Stats and Lists)
+
+    // Permission choke point (fail-closed), covering every GET action below
+    // including get_audit_logs. get_dashboard_data maps to the implicit
+    // 'dashboard.view' baseline (any active admin); everything else needs an
+    // explicit grant. Unmapped -> '__deny__' (denied for Subadmins).
+    require_admin_permission($pdo, ADMIN_API_GET_PERMS[$action] ?? '__deny__');
 
     // Part 3/6: paginated, filterable view over admin_audit_logs — the
     // generic audit trail every approve/reject/delete action in the app

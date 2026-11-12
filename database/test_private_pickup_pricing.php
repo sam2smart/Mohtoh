@@ -15,8 +15,10 @@
 //   B  admin can save a car rate card, and the car price follows it
 //   C  changing keke leaves car untouched, and vice versa (independence)
 //   D  minimum / maximum clamps apply per class
-//   E  the accepting driver's class - not the request placeholder - is what
-//      the rider is finally charged
+//   E  the passenger's CHOSEN-class fare is stamped at creation and flows
+//      UNCHANGED into the trip + payment - a car finalises trip-only, a keke's
+//      repositioning-inclusive fare reaches the trip only via passenger consent,
+//      and neither path silently re-prices what the passenger agreed to (#2/#3)
 //   F  Join Ride pricing is unchanged by any of it
 //
 // Every setting it touches is restored in the teardown, and every row it
@@ -28,7 +30,17 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/private_pickup.php';
 
-$BASE = getenv('MOHTOH_BASE_URL') ?: 'http://localhost/Mostmerit/merit_drives%20-%20Copy.v1';
+// Target the app this test file physically lives in - so running it from a git
+// worktree hits THAT worktree's endpoints (Apache serves everything under
+// htdocs), not a stale main deployment that predates the fix. Override with
+// MOHTOH_BASE_URL for any other host.
+$BASE = getenv('MOHTOH_BASE_URL') ?: (function () {
+    $appRoot = str_replace('\\', '/', dirname(__DIR__));   // <docroot>/.../<app>
+    $pos = stripos($appRoot, '/htdocs/');
+    if ($pos === false) { return 'http://localhost/Mostmerit/merit_drives%20-%20Copy.v1'; }
+    $rel = substr($appRoot, $pos + strlen('/htdocs/'));    // path under the web root
+    return 'http://localhost/' . implode('/', array_map('rawurlencode', explode('/', $rel)));
+})();
 $SESSION_DIR = ini_get('session.save_path') ?: sys_get_temp_dir();
 
 $pass = 0; $fail = 0;
@@ -131,10 +143,9 @@ try {
     $sessions['admin'] = make_session($superAdmin);
     echo "admin: {$superAdmin['email']} (id {$superAdmin['id']})\n";
 
-    $rider = $pdo->query("SELECT id, user_type, fullname, email FROM users WHERE user_type = 'rider' AND is_verified = 1 ORDER BY id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    if (!$rider) { echo "No verified rider to quote for. Aborting.\n"; exit(1); }
-    $sessions['rider'] = make_session($rider);
-    echo "rider: {$rider['email']} (id {$rider['id']})\n";
+    // The rider we quote estimates for in A-D is a throwaway created below with
+    // the other test users (see $mkRider), so this test never depends on there
+    // being a pre-existing verified rider in the database.
 
     // A 10 km-ish leg, fixed, so every assertion below compares like with like.
     $coords = ['plat' => 6.5244, 'plng' => 3.3792, 'dlat' => 6.6018, 'dlng' => 3.3515];
@@ -168,10 +179,16 @@ try {
                 email_verified, phone_verified, is_verified, is_online, is_keke_driver,
                 private_pickup_enabled, pickup_available_today, pickup_availability_date,
                 latitude, longitude, last_location_update, wallet_balance)
-             VALUES (?, ?, ?, ?, ?, 'driver', 1, 1, 1, 1, ?, 1, 1, CURDATE(), ?, ?, ?, 500000)"
+             VALUES (?, ?, ?, ?, ?, 'driver', 1, 1, 1, 1, ?, 1, 1, ?, ?, ?, ?, 500000)"
         )->execute([
             'ppp-' . uniqid(), $name, 'ppp-' . uniqid(), $email, $hash,
-            $vtype === 'keke' ? 1 : 0, $lat, $lng, $now,
+            // pickup_availability_date MUST be seeded with PHP date('Y-m-d'),
+            // NOT MySQL CURDATE(): eligibility.php:127 and the driver feed both
+            // compare this column against PHP date('Y-m-d'). When the PHP and
+            // MySQL clocks straddle midnight (they can differ by hours here)
+            // CURDATE() != PHP today, the driver reads as "unavailable", and the
+            // whole accept/propose flow is refused. Match the code under test.
+            $vtype === 'keke' ? 1 : 0, date('Y-m-d'), $lat, $lng, $now,
         ]);
         $id = (int)$pdo->lastInsertId();
         $createdUsers[] = $id;
@@ -190,8 +207,11 @@ try {
 
     $riderKeke = $mkRider('PPPrice Rider Keke');
     $riderCar  = $mkRider('PPPrice Rider Car');
+    $riderQuote = $mkRider('PPPrice Rider Quote');
     $sessions['rider_keke'] = make_session($riderKeke);
     $sessions['rider_car']  = make_session($riderCar);
+    $sessions['rider']      = make_session($riderQuote);
+    echo "rider (quotes): {$riderQuote['email']} (id {$riderQuote['id']})\n";
 
     $kekeDriver = $mkDriver('PPPrice Keke Driver', 'keke', $coords['plat'] + (3 / 111.0), $coords['plng']);
     $carDriver  = $mkDriver('PPPrice Car Driver',  'car',  $coords['plat'] + (4 / 111.0), $coords['plng']);
@@ -276,13 +296,15 @@ try {
     admin_save($sessions['admin'], ['private_pickup_car_maximum_fare' => '0']);
 
     // ==================================================================
-    echo "\n---- E. the ACCEPTING driver's class is what is charged ----\n";
+    echo "\n---- E. chosen-class fare flows unchanged into trip + payment (#2/#3) ----\n";
     // ==================================================================
     // Live rate cards now: keke 250 + 95/km, car 600 + 230/km, clamps off.
-    $expectKekeFare = round(250 + ($distance * 95) + $booking, 2);
-    $expectCarFare  = round(600 + ($distance * 230) + $booking, 2);
+    $expectKekeTripOnly = round(250 + ($distance * 95) + $booking, 2);
+    $expectCarTripOnly  = round(600 + ($distance * 230) + $booking, 2);
 
-    $mkRequest = function (string $riderSession) use ($coords, &$requestIds) {
+    // Create a request for a SPECIFIC vehicle class (the passenger's choice,
+    // criterion #5 - the backend now requires it).
+    $mkRequest = function (string $riderSession, string $vehicleType) use ($coords, &$requestIds) {
         global $BASE;
         $res = call($riderSession, "$BASE/api/private-pickup.php", [
             'action' => 'create',
@@ -290,7 +312,7 @@ try {
             'pickup_lat' => $coords['plat'], 'pickup_lng' => $coords['plng'],
             'destination' => 'PPPrice destination',
             'destination_lat' => $coords['dlat'], 'destination_lng' => $coords['dlng'],
-            'notes' => 'pricing test',
+            'notes' => 'pricing test', 'vehicle_type' => $vehicleType,
         ]);
         $id = $res['data']['request_public_id'] ?? null;
         if ($id) { $requestIds[] = $id; }
@@ -307,10 +329,11 @@ try {
         return null;
     };
 
-    // The three money rows the trip is actually built on.
+    // The money rows the trip is actually built on, plus the negotiation state.
     $dbFare = function (string $publicId) use ($pdo) {
         $stmt = $pdo->prepare(
-            "SELECT r.price AS request_price, rs.price_per_passenger, p.fare_amount
+            "SELECT r.price AS request_price, r.proposed_fare, r.status AS req_status,
+                    r.matched_ride_share_id, rs.price_per_passenger, p.fare_amount
              FROM ride_requests r
              LEFT JOIN ride_shares rs ON rs.id = r.matched_ride_share_id
              LEFT JOIN payments p ON p.ride_share_id = rs.id
@@ -328,58 +351,74 @@ try {
         return $res['data'] ?? [];
     };
 
-    // ---- E1. a KEKE driver accepts ----
-    [$res, $kekeReq] = $mkRequest($sessions['rider_keke']);
-    check('rider can create a pickup request', $kekeReq !== null, json_encode($res));
+    // ---- E1. a CAR request: trip-only, one-tap finalise, NO repricing ----
+    [$resC, $carReq] = $mkRequest($sessions['rider_car'], 'car');
+    check('rider can create a CAR pickup request', $carReq !== null, json_encode($resC));
 
-    if ($kekeReq) {
-        $kekeOffer = $feedRow($sessions['keke_driver'], $kekeReq);
-        $carOffer  = $feedRow($sessions['car_driver'], $kekeReq);
-        check('keke driver is offered the KEKE fare',
-            $kekeOffer !== null && near((float)$kekeOffer['fare'], $expectKekeFare),
-            "expected $expectKekeFare got " . var_export($kekeOffer['fare'] ?? null, true));
-        check('car driver is offered the CAR fare for the same request',
-            $carOffer !== null && near((float)$carOffer['fare'], $expectCarFare),
-            "expected $expectCarFare got " . var_export($carOffer['fare'] ?? null, true));
+    if ($carReq) {
+        $stampedCar = (float)$pdo->query("SELECT price FROM ride_requests WHERE public_id = " . $pdo->quote($carReq))->fetchColumn();
+        check('car request stamped at the CAR trip-only fare on creation', near($stampedCar, $expectCarTripOnly), "expected $expectCarTripOnly got $stampedCar");
 
-        $acc = call($sessions['keke_driver'], "$BASE/api/private-pickup.php",
-            ['action' => 'accept', 'request_public_id' => $kekeReq]);
-        check('keke driver can accept', ($acc['status'] ?? '') === 'success', json_encode($acc));
+        $carOffer = $feedRow($sessions['car_driver'], $carReq);
+        check('car driver is offered the CAR fare (trip-only)', $carOffer !== null && near((float)$carOffer['your_fare'], $expectCarTripOnly),
+            "expected $expectCarTripOnly got " . var_export($carOffer['your_fare'] ?? null, true));
+        check('car offer needs NO consent (your_fare == passenger_offer)',
+            $carOffer !== null && $carOffer['requires_consent'] === false && near((float)$carOffer['your_fare'], (float)$carOffer['passenger_offer']));
 
-        $row = $dbFare($kekeReq);
-        check('ride_requests.price is the keke fare', near((float)($row['request_price'] ?? 0), $expectKekeFare), json_encode($row));
-        check('ride_shares.price_per_passenger is the keke fare', near((float)($row['price_per_passenger'] ?? 0), $expectKekeFare), json_encode($row));
-        check('payments.fare_amount is the keke fare', near((float)($row['fare_amount'] ?? 0), $expectKekeFare), json_encode($row));
+        $acc = call($sessions['car_driver'], "$BASE/api/private-pickup.php", ['action' => 'accept', 'request_public_id' => $carReq]);
+        check('car driver accept FINALISES', ($acc['status'] ?? '') === 'success' && ($acc['data']['outcome'] ?? '') === 'accepted', json_encode($acc));
 
-        $st = $status($sessions['rider_keke'], $kekeReq);
-        check('rider status reports the keke fare and class',
-            near((float)($st['price'] ?? 0), $expectKekeFare) && ($st['vehicle_type'] ?? '') === 'keke',
+        $row = $dbFare($carReq);
+        check('car: ride_requests.price UNCHANGED (no silent repricing #2/#3)', near((float)($row['request_price'] ?? 0), $expectCarTripOnly), json_encode($row));
+        check('car: ride_shares.price_per_passenger is the car fare', near((float)($row['price_per_passenger'] ?? 0), $expectCarTripOnly), json_encode($row));
+        check('car: payments.fare_amount is the car fare', near((float)($row['fare_amount'] ?? 0), $expectCarTripOnly), json_encode($row));
+
+        $st = $status($sessions['rider_car'], $carReq);
+        check('car: rider status reports the car fare and class',
+            near((float)($st['price'] ?? 0), $expectCarTripOnly) && ($st['vehicle_type'] ?? '') === 'car',
             json_encode(['price' => $st['price'] ?? null, 'vehicle_type' => $st['vehicle_type'] ?? null]));
     }
 
-    // ---- E2. a CAR driver accepts: the keke placeholder must be replaced ----
-    [$res2, $carReq] = $mkRequest($sessions['rider_car']);
-    check('second rider can create a pickup request', $carReq !== null, json_encode($res2));
+    // ---- E2. a KEKE request: repositioning fare reaches the trip only via consent ----
+    [$resK, $kekeReq] = $mkRequest($sessions['rider_keke'], 'keke');
+    check('rider can create a KEKE pickup request', $kekeReq !== null, json_encode($resK));
 
-    if ($carReq) {
-        $stamped = (float)$pdo->query("SELECT price FROM ride_requests WHERE public_id = " . $pdo->quote($carReq))->fetchColumn();
-        check('a fresh request is stamped with the keke placeholder', near($stamped, $expectKekeFare), "got $stamped");
+    if ($kekeReq) {
+        $stampedKeke = (float)$pdo->query("SELECT price FROM ride_requests WHERE public_id = " . $pdo->quote($kekeReq))->fetchColumn();
+        check('keke request stamped at the KEKE trip-only fare on creation', near($stampedKeke, $expectKekeTripOnly), "expected $expectKekeTripOnly got $stampedKeke");
+        check('keke and car opening fares differ (separate lanes #6/#10)', !near($expectKekeTripOnly, $expectCarTripOnly));
 
-        $acc = call($sessions['car_driver'], "$BASE/api/private-pickup.php",
-            ['action' => 'accept', 'request_public_id' => $carReq]);
-        check('car driver can accept', ($acc['status'] ?? '') === 'success', json_encode($acc));
+        // keke driver is ~3km from the pickup point -> its fare includes that
+        // repositioning leg (#7), so it is HIGHER than the trip-only offer and
+        // needs the passenger's consent.
+        $kekeOffer = $feedRow($sessions['keke_driver'], $kekeReq);
+        $proposedFare = $kekeOffer !== null ? (float)$kekeOffer['your_fare'] : 0.0;
+        check('keke driver fare INCLUDES repositioning (> trip-only offer, #7)',
+            $kekeOffer !== null && $proposedFare > (float)$kekeOffer['passenger_offer'] && (float)$kekeOffer['reposition_km'] > 0,
+            json_encode($kekeOffer ? ['your_fare'=>$proposedFare,'offer'=>$kekeOffer['passenger_offer'],'repo'=>$kekeOffer['reposition_km']] : null));
+        check('keke offer REQUIRES consent', $kekeOffer !== null && $kekeOffer['requires_consent'] === true);
 
-        $row = $dbFare($carReq);
-        check('ride_requests.price was RE-PRICED to the car fare', near((float)($row['request_price'] ?? 0), $expectCarFare), json_encode($row));
-        check('ride_shares.price_per_passenger is the car fare', near((float)($row['price_per_passenger'] ?? 0), $expectCarFare), json_encode($row));
-        check('payments.fare_amount is the car fare', near((float)($row['fare_amount'] ?? 0), $expectCarFare), json_encode($row));
+        // accept must PROPOSE, not finalise: no trip, price untouched (#3).
+        $acc = call($sessions['keke_driver'], "$BASE/api/private-pickup.php", ['action' => 'accept', 'request_public_id' => $kekeReq]);
+        check('keke accept becomes a PROPOSAL', ($acc['status'] ?? '') === 'success' && ($acc['data']['outcome'] ?? '') === 'proposed', json_encode($acc));
+        $mid = $dbFare($kekeReq);
+        check('keke proposal: NO trip spawned', empty($mid['matched_ride_share_id']), json_encode($mid));
+        check('keke proposal: price STILL the trip-only offer (untouched #2)', near((float)($mid['request_price'] ?? 0), $expectKekeTripOnly), json_encode($mid));
+        check('keke proposal: proposed_fare = repositioning-inclusive fare', near((float)($mid['proposed_fare'] ?? 0), $proposedFare), json_encode($mid));
 
-        $st = $status($sessions['rider_car'], $carReq);
-        check('rider status reports the car fare and class',
-            near((float)($st['price'] ?? 0), $expectCarFare) && ($st['vehicle_type'] ?? '') === 'car',
+        // passenger consents -> the agreed fare becomes authoritative.
+        $cf = call($sessions['rider_keke'], "$BASE/api/private-pickup.php", ['action' => 'accept_fare', 'request_public_id' => $kekeReq]);
+        check('passenger accept_fare succeeds', ($cf['status'] ?? '') === 'success', json_encode($cf));
+
+        $row = $dbFare($kekeReq);
+        check('keke after consent: ride_requests.price = agreed (repositioning) fare', near((float)($row['request_price'] ?? 0), $proposedFare), json_encode($row));
+        check('keke after consent: ride_shares.price_per_passenger = agreed fare', near((float)($row['price_per_passenger'] ?? 0), $proposedFare), json_encode($row));
+        check('keke after consent: payments.fare_amount = agreed fare', near((float)($row['fare_amount'] ?? 0), $proposedFare), json_encode($row));
+
+        $st = $status($sessions['rider_keke'], $kekeReq);
+        check('keke: rider status reports the agreed fare and keke class',
+            near((float)($st['price'] ?? 0), $proposedFare) && ($st['vehicle_type'] ?? '') === 'keke',
             json_encode(['price' => $st['price'] ?? null, 'vehicle_type' => $st['vehicle_type'] ?? null]));
-        check('the car trip was NOT charged at the keke placeholder rate',
-            !near((float)($row['fare_amount'] ?? 0), $expectKekeFare), json_encode($row));
     }
     // ==========================================================
     echo "\n---- F. Join Ride pricing is untouched by all of it ----\n";

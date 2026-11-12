@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (photos.length) {
       html += `<div class="u-text-xs u-text-soft u-mb-2">Uploaded photos</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:var(--space-4);">`
-        + photos.map((p) => `<img src="../uploads/${escapeHtml(p.photo_path)}" alt="Vehicle photo" style="width:100%;height:64px;object-fit:cover;border-radius:var(--radius-sm);">`).join('')
+        + photos.map((p) => `<img src="../img.php?f=${encodeURIComponent(p.photo_path)}&w=400" loading="lazy" alt="Vehicle photo" style="width:100%;height:64px;object-fit:cover;border-radius:var(--radius-sm);cursor:pointer;" onclick="if(window.MeritImageViewer&&window.MeritImageViewer.open)window.MeritImageViewer.open('../uploads/${escapeHtml(p.photo_path)}','Vehicle photo')">`).join('')
         + `</div>`;
     }
 
@@ -1313,11 +1313,63 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = await apiPost('../api/rideshare.php', payload);
       if (data.status === 'success') {
-        showAlert(createRideAlert, 'success', data.message || 'Ride published.');
         createRideForm.reset();
         resetPricePreview();
         await loadMyRides();
-        setTimeout(() => closeSheet(createRideSheet, qs('[data-sheet-scrim]')), 700);
+
+        // Build the shareable link for this specific ride.
+        // join.php?ride=PUBLIC_ID → rider dashboard auto-opens the booking
+        // sheet for this ride (logged-in riders) or login page (new users).
+        const publicId  = data.data?.ride_public_id || '';
+        const origin    = window.location.origin;
+        const base      = window.location.pathname.split('/').slice(0, -2).join('/'); // up two levels from driver/
+        const shareUrl  = publicId ? `${origin}${base}/join.php?ride=${encodeURIComponent(publicId)}` : null;
+        const pickup    = payload.pickup_location || 'pickup';
+        const dest      = payload.destination    || 'destination';
+        const shareText = `I'm offering seats from ${pickup} to ${dest} on MohToh. Book your seat here:`;
+
+        if (shareUrl) {
+          // Replace the form with a compact success + share card so the
+          // driver sees and can act on the link without another tap.
+          createRideAlert.className = 'alert-banner success';
+          createRideAlert.innerHTML = `
+            <div style="margin-bottom:var(--space-3);">
+              <strong><i class="bi bi-check-circle-fill"></i> Ride published!</strong><br>
+              <span class="u-text-xs u-text-soft">Share the link below so passengers can find and book your ride.</span>
+            </div>
+            <div class="field" style="background:var(--color-surface);margin-bottom:var(--space-3);gap:8px;">
+              <i class="bi bi-link-45deg" style="flex-shrink:0;"></i>
+              <input id="rideShareUrlInput" type="text" value="${escapeHtml(shareUrl)}" readonly
+                style="border:none;padding:0;font-size:var(--text-xs);color:var(--color-text-soft);flex:1;min-width:0;">
+            </div>
+            <div class="u-flex u-gap-3">
+              <button type="button" class="btn btn-primary" id="shareRideLinkBtn" style="flex:1;">
+                <i class="bi bi-share"></i> Share this ride
+              </button>
+              <button type="button" class="btn btn-outline" id="copyRideLinkBtn">
+                <i class="bi bi-clipboard"></i>
+              </button>
+            </div>`;
+
+          qs('#shareRideLinkBtn')?.addEventListener('click', () => {
+            window.MohToh?.share.shareLink(shareUrl, 'Join my ride on MohToh', shareText);
+          });
+          qs('#copyRideLinkBtn')?.addEventListener('click', () => {
+            navigator.clipboard?.writeText(shareUrl).then(() => showToast('Link copied!')).catch(() => {
+              qs('#rideShareUrlInput')?.select();
+              document.execCommand('copy');
+              showToast('Link copied!');
+            });
+          });
+        } else {
+          showAlert(createRideAlert, 'success', data.message || 'Ride published.');
+        }
+
+        // Auto-close after a short delay only when there's no share action pending.
+        // With the share card visible, let the driver close manually.
+        if (!shareUrl) {
+          setTimeout(() => closeSheet(createRideSheet, qs('[data-sheet-scrim]')), 700);
+        }
       } else {
         showAlert(createRideAlert, 'error', data.message);
       }
@@ -1327,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setButtonLoading(publishRideBtn, false);
     }
   });
+
 
   // ---------------------------------------------------------------
   // "Suggest as a MohToh location" — only offered when the selected

@@ -208,20 +208,85 @@ document.addEventListener('DOMContentLoaded', () => {
   function pickupCard(r) {
     const dist = r.distance_to_pickup_km != null ? Number(r.distance_to_pickup_km).toFixed(1) : '—';
     const trip = r.trip_distance_km != null ? Number(r.trip_distance_km).toFixed(1) : '—';
-    const fare = r.fare != null ? Number(r.fare).toLocaleString() : '—';
+    // your_fare is the exact amount THIS driver is paid on accept: for a keke
+    // it already includes the run to the pickup point (criterion #7); for a
+    // car it is trip-only (criterion #9). passenger_offer is what the rider is
+    // currently looking at. When they differ, accepting cannot silently change
+    // the price — it must be PROPOSED and the rider must consent (criteria
+    // #3/#4). requires_consent is decided by the server, not here.
+    const yourFare = Number(r.your_fare != null ? r.your_fare : r.fare || 0);
+    const offer    = Number(r.passenger_offer != null ? r.passenger_offer : yourFare);
+    const consent  = !!r.requires_consent;
+    const id = r.request_public_id;
+    const repo = (r.reposition_km != null && Number(r.reposition_km) > 0)
+      ? ` · Repositioning ~${Number(r.reposition_km).toFixed(1)} km` : '';
+
+    // Fare header: a single agreed figure, or the offer-vs-your-fare split.
+    const fareHeader = consent
+      ? `<div class="u-flex u-justify-between u-items-center u-mb-2">
+           <span class="pricing-badge is-success"><i class="bi bi-cash-coin"></i> Your fare ₦${yourFare.toLocaleString()}</span>
+           <span class="pricing-badge is-info"><i class="bi bi-signpost-2"></i> ${dist} km to pickup</span>
+         </div>
+         <div class="u-text-xs u-text-faint u-mb-2">Passenger offered ₦${offer.toLocaleString()} — propose your fare for them to confirm.</div>`
+      : `<div class="u-flex u-justify-between u-items-center u-mb-2">
+           <span class="pricing-badge is-success"><i class="bi bi-cash-coin"></i> ₦${yourFare.toLocaleString()}</span>
+           <span class="pricing-badge is-info"><i class="bi bi-signpost-2"></i> ${dist} km to pickup</span>
+         </div>`;
+
+    // The custom-amount row lets a driver name a different price than the
+    // one-tap figure — always a PROPOSAL the passenger must confirm, never
+    // final (criteria #3/#4). Offered on BOTH lanes: a car driver whose fare
+    // already equals the offer can still counter-offer a different amount,
+    // exactly as a keke can.
+    const customRow =
+      `<button type="button" class="btn btn-ghost btn-sm" data-toggle-custom="${id}" style="width:100%;">Propose a different amount</button>
+       <div class="u-hidden u-mt-2" data-custom="${id}">
+         <div class="field"><i class="bi bi-cash"></i><input type="number" min="1" step="1" inputmode="numeric" placeholder="Enter your fare (₦)" data-custom-input="${id}"></div>
+         <button type="button" class="btn btn-primary btn-sm u-mt-2" style="width:100%;" data-custom-send="${id}">Send proposal</button>
+       </div>`;
+
+    // Actions: cars (fare == offer) finalise with one tap; keke / any changed
+    // fare can only be proposed. Either way the custom-amount row is available
+    // for a counter-offer.
+    const actions = consent
+      ? `<div class="u-flex u-gap-2 u-mb-2">
+           <button type="button" class="btn btn-primary btn-sm" style="width:auto;flex:1;" data-pickup-propose="${id}">Propose ₦${yourFare.toLocaleString()}</button>
+           <button type="button" class="btn btn-outline btn-sm" style="width:auto;flex:1;" data-pickup-decline="${id}">Decline</button>
+         </div>
+         ${customRow}`
+      : `<div class="u-flex u-gap-2 u-mb-2">
+           <button type="button" class="btn btn-primary btn-sm" style="width:auto;flex:1;" data-pickup-accept="${id}">Accept ₦${yourFare.toLocaleString()}</button>
+           <button type="button" class="btn btn-outline btn-sm" style="width:auto;flex:1;" data-pickup-decline="${id}">Decline</button>
+         </div>
+         ${customRow}`;
+
     return `
-      <div class="card u-mb-3 anim-fade-in" data-pickup-card="${r.request_public_id}" style="padding:var(--space-4);border-left:3px solid var(--color-primary);">
-        <div class="u-flex u-justify-between u-items-center u-mb-2">
-          <span class="pricing-badge is-success"><i class="bi bi-cash-coin"></i> ₦${fare}</span>
-          <span class="pricing-badge is-info"><i class="bi bi-signpost-2"></i> ${dist} km to pickup</span>
-        </div>
+      <div class="card u-mb-3 anim-fade-in" data-pickup-card="${id}" style="padding:var(--space-4);border-left:3px solid var(--color-primary);">
+        ${fareHeader}
         <div class="ride-tile__dest" style="margin:0 0 4px;"><i class="bi bi-record-circle" style="color:var(--color-primary);font-size:.7rem;"></i>${escapeHtml(r.pickup_location)}</div>
         <div class="ride-tile__dest" style="margin:0 0 8px;"><i class="bi bi-geo-alt-fill" style="color:var(--color-danger);font-size:.7rem;"></i>${escapeHtml(r.destination)}</div>
-        <div class="u-text-xs u-text-faint u-mb-3"><i class="bi bi-person"></i> ${escapeHtml(r.rider_name || 'Rider')} · Trip ~${trip} km</div>
-        <div class="u-flex u-gap-2">
-          <button type="button" class="btn btn-primary btn-sm" style="width:auto;flex:1;" data-pickup-accept="${r.request_public_id}">Accept</button>
-          <button type="button" class="btn btn-outline btn-sm" style="width:auto;flex:1;" data-pickup-decline="${r.request_public_id}">Decline</button>
+        <div class="u-text-xs u-text-faint u-mb-3"><i class="bi bi-person"></i> ${escapeHtml(r.rider_name || 'Rider')} · ${escapeHtml(r.vehicle_type_label || 'Private')} · Trip ~${trip} km${repo}</div>
+        ${actions}
+      </div>`;
+  }
+
+  // A request this driver has proposed a fare on and is now waiting for the
+  // passenger to accept or decline. Read-only status card (criteria #5/#8):
+  // the negotiation is in the passenger's hands, so there is no action here —
+  // it clears itself when they accept (→ shows under Trips) or decline (→ the
+  // request reopens into the feed below).
+  function proposalWaitingCard(p) {
+    const proposed = Number(p.proposed_fare || 0);
+    const offer    = Number(p.passenger_offer || 0);
+    return `
+      <div class="card u-mb-3 anim-fade-in" data-pickup-proposal="${p.request_public_id}" style="padding:var(--space-4);border-left:3px solid var(--color-warning,#E8A33D);">
+        <div class="u-flex u-justify-between u-items-center u-mb-2">
+          <span class="pricing-badge is-info"><i class="bi bi-hourglass-split"></i> Waiting for passenger</span>
+          <span class="u-text-sm u-text-strong">You proposed ₦${proposed.toLocaleString()}</span>
         </div>
+        <div class="ride-tile__dest" style="margin:0 0 4px;"><i class="bi bi-record-circle" style="color:var(--color-primary);font-size:.7rem;"></i>${escapeHtml(p.pickup_location)}</div>
+        <div class="ride-tile__dest" style="margin:0 0 8px;"><i class="bi bi-geo-alt-fill" style="color:var(--color-danger);font-size:.7rem;"></i>${escapeHtml(p.destination)}</div>
+        <div class="u-text-xs u-text-faint"><i class="bi bi-person"></i> ${escapeHtml(p.rider_name || 'Rider')} · ${escapeHtml(p.vehicle_type_label || 'Private')} · They offered ₦${offer.toLocaleString()}</div>
       </div>`;
   }
 
@@ -248,8 +313,11 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.forEach((r) => alertedIds.add(r.request_public_id));
     firstFeedLoad = false;
 
-    listContainer.innerHTML = rows.map(pickupCard).join('');
-    emptyEl.classList.toggle('u-hidden', rows.length > 0);
+    // Proposals this driver is awaiting a decision on render first (as
+    // read-only "waiting" cards), then the live pending requests below them.
+    const proposals = payload.proposals || [];
+    listContainer.innerHTML = proposals.map(proposalWaitingCard).join('') + rows.map(pickupCard).join('');
+    emptyEl.classList.toggle('u-hidden', (proposals.length + rows.length) > 0);
   }
 
   function startFeed() {
@@ -271,10 +339,59 @@ document.addEventListener('DOMContentLoaded', () => {
     if (locTimer) { clearInterval(locTimer); locTimer = null; }
   }
 
-  // ---- accept / decline ---------------------------------------------
+  // ---- accept / propose / decline -----------------------------------
+  // Shared handler for the two ways a driver commits to a fare:
+  //   accept  -> finalise at the passenger's offer (only offered for cars /
+  //              a keke already at the pickup, where nothing changed).
+  //   propose -> send a fare for the passenger to confirm. NEVER final on its
+  //              own (criteria #3/#4); the backend records it and waits.
+  async function sendProposal(id, amount, triggerBtn) {
+    triggerBtn.disabled = true;
+    const original = triggerBtn.innerHTML;
+    triggerBtn.innerHTML = '<span class="btn-spinner"></span>';
+    const payload = { action: 'propose', request_public_id: id };
+    if (amount != null) payload.amount = amount;
+    const res = await apiPost('../api/private-pickup.php', payload);
+    if (res.status !== 'success') {
+      triggerBtn.disabled = false;
+      triggerBtn.innerHTML = original;
+      showToast(res.message || 'Could not send your fare.');
+      loadPickupFeed();
+      return;
+    }
+    const outcome = res.data && res.data.outcome;
+    if (outcome === 'accepted') {
+      // The proposed amount matched the offer exactly, so it finalised — the
+      // trip is spawned and this driver is en route.
+      if (window.MohToh && window.MohToh.sound) window.MohToh.sound.play('success');
+      showToast(res.message || 'Pickup accepted.');
+      setTimeout(() => { window.location.href = 'trips.php'; }, 800);
+      return;
+    }
+    // Proposed and waiting on the passenger. The request leaves the pending
+    // pool and comes straight back as a "waiting for passenger" card via the
+    // feed's proposals list — refresh now so the driver sees that transition
+    // immediately rather than an empty gap until the next poll. (No declinedIds
+    // entry: if the passenger later rejects, the reopened request should be
+    // offered to this driver again.)
+    showToast(res.message || 'Fare proposed. Waiting for the passenger to confirm.');
+    triggerBtn.closest('[data-pickup-card]')?.remove();
+    loadPickupFeed();
+  }
+
   listContainer.addEventListener('click', async (e) => {
-    const acceptBtn = e.target.closest('[data-pickup-accept]');
-    const declineBtn = e.target.closest('[data-pickup-decline]');
+    const acceptBtn   = e.target.closest('[data-pickup-accept]');
+    const declineBtn  = e.target.closest('[data-pickup-decline]');
+    const proposeBtn  = e.target.closest('[data-pickup-propose]');
+    const toggleBtn   = e.target.closest('[data-toggle-custom]');
+    const customSend  = e.target.closest('[data-custom-send]');
+
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.toggleCustom;
+      const row = listContainer.querySelector(`[data-custom="${id}"]`);
+      if (row) row.classList.toggle('u-hidden');
+      return;
+    }
 
     if (declineBtn) {
       const id = declineBtn.dataset.pickupDecline;
@@ -282,10 +399,26 @@ document.addEventListener('DOMContentLoaded', () => {
       await apiPost('../api/private-pickup.php', { action: 'decline', request_public_id: id });
       // Declining is per-driver and non-destructive server-side, so the feed
       // keeps returning this request. Remember it locally as well as removing
-      // the card, otherwise the next 8s poll re-renders it.
+      // the card, otherwise the next poll re-renders it.
       declinedIds.add(id);
       declineBtn.closest('[data-pickup-card]')?.remove();
       emptyEl.classList.toggle('u-hidden', listContainer.children.length > 0);
+      return;
+    }
+
+    if (customSend) {
+      const id = customSend.dataset.customSend;
+      const input = listContainer.querySelector(`[data-custom-input="${id}"]`);
+      const amount = input ? Number(input.value) : NaN;
+      if (!amount || amount <= 0) { showToast('Enter a valid fare to propose.'); return; }
+      await sendProposal(id, amount, customSend);
+      return;
+    }
+
+    if (proposeBtn) {
+      const id = proposeBtn.dataset.pickupPropose;
+      // No amount -> the server proposes this driver's own computed fare.
+      await sendProposal(id, null, proposeBtn);
       return;
     }
 
@@ -294,13 +427,18 @@ document.addEventListener('DOMContentLoaded', () => {
       acceptBtn.disabled = true;
       acceptBtn.innerHTML = '<span class="btn-spinner"></span>';
       const res = await apiPost('../api/private-pickup.php', { action: 'accept', request_public_id: id });
-      if (res.status === 'success') {
+      if (res.status === 'success' && res.data && res.data.outcome === 'accepted') {
         if (window.MohToh && window.MohToh.sound) window.MohToh.sound.play('success');
         showToast(res.message || 'Pickup accepted.');
-        // The request is now claimed — refresh the feed (it will drop away).
         loadPickupFeed();
-        // Take the driver to the live trip screen for the spawned ride.
         setTimeout(() => { window.location.href = 'trips.php'; }, 800);
+      } else if (res.status === 'success' && res.data && res.data.outcome === 'proposed') {
+        // The server converted a fare that no longer matches the offer into a
+        // proposal rather than finalising it (criterion #4) — refresh so it
+        // shows as a "waiting for passenger" card.
+        showToast(res.message || 'Fare proposed. Waiting for the passenger to confirm.');
+        acceptBtn.closest('[data-pickup-card]')?.remove();
+        loadPickupFeed();
       } else {
         // Lost the race, expired, or eligibility changed — re-enable and
         // refresh so the driver sees the current, true state.

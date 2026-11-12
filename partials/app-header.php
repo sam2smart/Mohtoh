@@ -16,7 +16,8 @@ $__isOnline = !empty($isOnline);
     <?php if (!empty($pageTitle)): ?>
         <span class="app-floating-header__title"><?= htmlspecialchars($pageTitle) ?></span>
     <?php else: ?>
-        <span class="app-floating-header__brand"><span class="brand-dot-sm"><i class="bi bi-signpost-split-fill"></i></span>MohToh</span>
+        <span class="app-floating-header__brand"><span class="brand-dot-sm"><img src="../assets/icons/icon-192.png"  style=" width: 30px; height: 30px; margin: 0 0 0 0;"/></span>MohToh</span>
+        <!-- <span class="app-floating-header__brand"><span class="brand-dot-sm"><i class="bi bi-signpost-split-fill"></i></span>MohToh</span> -->
     <?php endif; ?>
 
     <div class="app-floating-header__actions">

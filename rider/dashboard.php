@@ -29,6 +29,8 @@ $userType = 'rider';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK join/withdrawal requests). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh — Home</title>
 
     <link rel="manifest" href="../manifest.json">
@@ -129,7 +131,7 @@ $userType = 'rider';
 
     <?php include __DIR__ . '/../partials/notification-sheet.php'; ?>
     <?php include __DIR__ . '/../partials/messages-sheet.php'; ?>
-    <?php include __DIR__ . '/../partials/community-rewards-sheet.php'; ?>
+    <?php include __DIR__ . '/../partials/network-sheet.php'; ?>
     <div class="sheet" id="rideDetailSheet" role="dialog" aria-modal="true">
         <div class="sheet-handle"></div>
         <div class="sheet-header">
@@ -237,9 +239,58 @@ $userType = 'rider';
 <script src="../assets/js/search.js"></script>
 <script src="../assets/js/rider-trip.js"></script>
 <script src="../assets/js/messages.js"></script>
-<script src="../assets/js/referrals.js"></script>
+<script src="../assets/js/network.js"></script>
 <script>
     document.getElementById('recenterBtn')?.addEventListener('click', () => centerMapOnUser());
+
+    // ---------------------------------------------------------------
+    // Ride deep-link auto-open (join.php?ride=PUBLIC_ID landing)
+    // search.js registers window.mtViewRideDetails once DOMContentLoaded
+    // fires — we need to call it after that init, so we use a tiny
+    // timeout (0ms = next event loop tick) to let search.js set up
+    // before we invoke its exported function.
+    // ---------------------------------------------------------------
+    (function () {
+        // Priority 1: URL query param (?open_ride=PUBLIC_ID) — direct landing.
+        const urlParams = new URLSearchParams(window.location.search);
+        const ridePublicId = urlParams.get('open_ride') || sessionStorage.getItem('mohtoh_pending_ride_link');
+
+        if (ridePublicId) {
+            // Clear session storage immediately so it doesn't re-open on refresh.
+            sessionStorage.removeItem('mohtoh_pending_ride_link');
+
+            // Look up the numeric ID for this public_id via the details endpoint.
+            // The endpoint accepts either numeric id or public_id — we send a
+            // search-by-public-id request and open the sheet once we have the id.
+            document.addEventListener('DOMContentLoaded', () => {
+                // Small delay to let search.js fully initialise its sheet/event wiring.
+                setTimeout(async () => {
+                    try {
+                        const data = await apiGet('../api/rideshare.php', {
+                            action: 'details',
+                            public_id: ridePublicId
+                        });
+                        if (data.status === 'success' && data.data?.ride?.id) {
+                            if (typeof window.mtViewRideDetails === 'function') {
+                                window.mtViewRideDetails(data.data.ride.id);
+                            }
+                        } else {
+                            // Ride not found or expired — silently ignore.
+                            console.info('[MohToh] Ride link', ridePublicId, 'not found or expired.');
+                        }
+                    } catch (err) {
+                        console.warn('[MohToh] Could not auto-open ride from share link:', err);
+                    }
+                    // Clean up the URL bar so sharing/refreshing doesn't re-open.
+                    if (urlParams.has('open_ride')) {
+                        const cleanUrl = window.location.pathname + window.location.search.replace(/[?&]open_ride=[^&]*/g, '').replace(/^&/, '?');
+                        window.history.replaceState(null, '', cleanUrl || window.location.pathname);
+                    }
+                }, 100);
+            });
+        }
+    })();
 </script>
 </body>
 </html>
+

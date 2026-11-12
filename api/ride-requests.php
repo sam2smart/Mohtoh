@@ -9,6 +9,7 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/ride_requests.php';
+require_once '../includes/admin_permissions.php'; // admin RBAC gates (require_admin_permission)
 
 header('Content-Type: application/json');
 
@@ -71,17 +72,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     if ($action === 'statistics') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Admin analytics view -> rides.view.
+        require_admin_permission($pdo, 'rides.view');
         json_response('success', 'Ride request analytics fetched', get_ride_request_analytics($pdo));
     }
 
     // Admin — Ride Request Management: cross-user filterable/paginated view.
     if ($action === 'admin_list') {
-        if ($_SESSION['user_type'] !== 'admin') {
-            json_response('error', 'Unauthorized');
-        }
+        // Admin cross-user ride-request view -> rides.view.
+        require_admin_permission($pdo, 'rides.view');
         [$page, $limit, $offset] = paginate_params();
         $filters = [
             'status' => $_GET['status'] ?? '',
@@ -153,7 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_response('error', 'ride_share_id is required');
         }
         if ($_SESSION['user_type'] === 'admin') {
-            // allowed
+            // Admin-triggered matching -> rides.manage (operational, grantable).
+            require_admin_permission($pdo, 'rides.manage');
         } elseif ($_SESSION['user_type'] === 'driver') {
             $stmt = $pdo->prepare("SELECT driver_id FROM ride_shares WHERE id = ?");
             $stmt->execute([$rideShareId]);

@@ -1,6 +1,8 @@
 ﻿<?php
 session_start();
 require_once '../includes/functions.php';
+require_once '../includes/db.php';                 // $pdo for the admin context/gate below
+require_once '../includes/admin_permissions.php';  // get_admin_context(), current_admin_can()
 require_login();
 
 // Route a wrong-role session to its own role's home — sending a still
@@ -11,15 +13,56 @@ if ($_SESSION['user_type'] !== 'admin') {
     header('Location: ' . $roleHome);
     exit;
 }
+
+// Server-side admin gate — the page equivalent of require_admin_access().
+// The session is already in admin mode (checked above), but re-read the DB so
+// a mid-session suspension or de-admin ejects on the very next refresh instead
+// of rendering the console shell. A page redirect (not the API's JSON denial)
+// so the person lands somewhere usable rather than staring at raw JSON.
+$adminCtx = get_admin_context($pdo);
+if (!$adminCtx['is_admin'] || $adminCtx['admin_status'] !== 'active' || $adminCtx['is_suspended']) {
+    header('Location: ../index.php');
+    exit;
+}
+
+// Display identity + capability, used by the topbar and (cosmetic) tab
+// visibility. current_admin_can() with $adminCtx passed does NOT re-hit the
+// DB, so wrapping ~20 nav links below is free.
+$adminName    = $_SESSION['fullname'] ?? 'Administrator';
+$adminIsSuper = !empty($adminCtx['is_super_admin']);
+$adminCan = function (string $perm) use ($pdo, $adminCtx): bool {
+    return current_admin_can($pdo, $perm, $adminCtx);
+};
+
+// Multi-role topbar switcher: does this admin ALSO hold a rider/driver hat? A
+// pure-admin account of record (user_type='admin') does not; a promoted
+// rider/driver does. switch-mode.php re-checks server-side, so this only
+// decides which topbar buttons to render.
+$adminOtherRole = 'admin';
+try {
+    $__roleStmt = $pdo->prepare("SELECT user_type FROM users WHERE id = ?");
+    $__roleStmt->execute([(int) $_SESSION['user_id']]);
+    $adminOtherRole = (string) $__roleStmt->fetchColumn();
+} catch (Exception $e) { /* leave as 'admin' — no switcher */ }
+$adminHasOtherRole = in_array($adminOtherRole, ['rider', 'driver'], true);
+
+// Whether the "Operations" section has at least one visible tab (so its
+// header doesn't render above an empty gap for a narrowly-scoped Subadmin).
+$showOpsSection = $adminIsSuper || $adminCan('pricing.view') || $adminCan('promotions.view')
+    || $adminCan('reports.view') || $adminCan('announcements.send') || $adminCan('rides.view')
+    || $adminCan('premium.view') || $adminCan('integrations.view');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- App CSRF token for authenticated state-changing fetches (e.g. MOHTOH NETWORK admin actions). Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>Admin Dashboard - Merit Drives</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/image-viewer.css">
     <style>
         :root { --primary:#2563eb; --secondary:#7c3aed; --success:#10b981; --warning:#f59e0b; --danger:#ef4444; --dark:#0f172a; --light:#f8fafc; --border:#e2e8f0; }
         /* Part 1: independent-scroll admin layout. Sidebar is fixed to
@@ -95,30 +138,36 @@ if ($_SESSION['user_type'] !== 'admin') {
         </div>
         <nav class="nav flex-column">
             <a class="nav-link active" href="#" data-tab="dashboard"><i class="fas fa-chart-line me-2"></i>Dashboard</a>
-            <a class="nav-link" href="#" data-tab="drivers"><i class="fas fa-user-tie me-2"></i>Drivers</a>
-            <a class="nav-link" href="#" data-tab="vehicles"><i class="fas fa-car me-2"></i>Vehicles</a>
-            <a class="nav-link" href="#" data-tab="locations"><i class="fas fa-map-pin me-2"></i>Locations</a>
-            <a class="nav-link" href="#" data-tab="passengers"><i class="fas fa-user me-2"></i>Passengers</a>
-            <a class="nav-link" href="#" data-tab="ride-sessions"><i class="fas fa-calendar-check me-2"></i>Ride Sessions</a>
-            <a class="nav-link" href="#" data-tab="bookings"><i class="fas fa-ticket-alt me-2"></i>Bookings</a>
+            <?php if ($adminCan('drivers.view')): ?><a class="nav-link" href="#" data-tab="drivers"><i class="fas fa-user-tie me-2"></i>Drivers</a><?php endif; ?>
+            <?php if ($adminCan('vehicles.view')): ?><a class="nav-link" href="#" data-tab="vehicles"><i class="fas fa-car me-2"></i>Vehicles</a><?php endif; ?>
+            <?php if ($adminCan('locations.manage')): ?><a class="nav-link" href="#" data-tab="locations"><i class="fas fa-map-pin me-2"></i>Locations</a><?php endif; ?>
+            <?php if ($adminCan('users.view')): ?><a class="nav-link" href="#" data-tab="passengers"><i class="fas fa-user me-2"></i>Passengers</a><?php endif; ?>
+            <?php if ($adminCan('rides.view')): ?><a class="nav-link" href="#" data-tab="ride-sessions"><i class="fas fa-calendar-check me-2"></i>Ride Sessions</a><?php endif; ?>
+            <?php if ($adminCan('rides.view')): ?><a class="nav-link" href="#" data-tab="bookings"><i class="fas fa-ticket-alt me-2"></i>Bookings</a><?php endif; ?>
             <a class="nav-link" href="#" data-tab="live-map"><i class="fas fa-map-marked-alt me-2"></i>Live Map</a>
-            <a class="nav-link" href="#" data-tab="notifications"><i class="fas fa-bullhorn me-2"></i>Announcements</a>
+            <?php if ($adminCan('announcements.send')): ?><a class="nav-link" href="#" data-tab="notifications"><i class="fas fa-bullhorn me-2"></i>Announcements</a><?php endif; ?>
 
-            <div class="text-white-50 text-uppercase small fw-bold px-2 pt-4 pb-1" style="letter-spacing:0.05em;">Operations</div>
-            <a class="nav-link" href="#" data-tab="pricing"><i class="fas fa-tags me-2"></i>Pricing Management</a>
-            <a class="nav-link" href="#" data-tab="driver-settings"><i class="fas fa-sliders-h me-2"></i>Driver Settings</a>
-            <a class="nav-link" href="#" data-tab="regional-pricing"><i class="fas fa-map-marked me-2"></i>Regional Pricing</a>
-            <a class="nav-link" href="#" data-tab="promotions"><i class="fas fa-percent me-2"></i>Promotions</a>
-            <a class="nav-link" href="#" data-tab="commission"><i class="fas fa-coins me-2"></i>Commission</a>
-            <a class="nav-link" href="#" data-tab="driver-comms"><i class="fas fa-comment-dots me-2"></i>Driver Communication</a>
-            <a class="nav-link" href="#" data-tab="waitlist"><i class="fas fa-users-line me-2"></i>Ride Queue Management</a>
-            <a class="nav-link" href="#" data-tab="ride-requests"><i class="fas fa-hand-point-right me-2"></i>Ride Request Management</a>
-            <a class="nav-link" href="#" data-tab="premium"><i class="fas fa-crown me-2"></i>Premium Features</a>
-            <a class="nav-link" href="#" data-tab="reports"><i class="fas fa-chart-bar me-2"></i>Reports</a>
-            <a class="nav-link" href="#" data-tab="integrations"><i class="fas fa-plug me-2"></i>Service Integration Center</a>
-            <a class="nav-link" href="#" data-tab="diagnostics"><i class="fas fa-heart-pulse me-2"></i>Diagnostics</a>
-            <a class="nav-link" href="#" data-tab="chat-monitoring"><i class="fas fa-comments me-2"></i>Chat Monitoring</a>
-            <a class="nav-link" href="#" data-tab="community-growth"><i class="fas fa-people-group me-2"></i>Community Growth</a>
+            <?php if ($showOpsSection): ?><div class="text-white-50 text-uppercase small fw-bold px-2 pt-4 pb-1" style="letter-spacing:0.05em;">Operations</div><?php endif; ?>
+            <?php if ($adminCan('pricing.view')): ?><a class="nav-link" href="#" data-tab="pricing"><i class="fas fa-tags me-2"></i>Pricing Management</a><?php endif; ?>
+            <?php if ($adminCan('pricing.view')): ?><a class="nav-link" href="#" data-tab="driver-settings"><i class="fas fa-sliders-h me-2"></i>Driver Settings</a><?php endif; ?>
+            <?php if ($adminCan('pricing.view')): ?><a class="nav-link" href="#" data-tab="regional-pricing"><i class="fas fa-map-marked me-2"></i>Regional Pricing</a><?php endif; ?>
+            <?php if ($adminCan('promotions.view')): ?><a class="nav-link" href="#" data-tab="promotions"><i class="fas fa-percent me-2"></i>Promotions</a><?php endif; ?>
+            <?php if ($adminCan('reports.view')): ?><a class="nav-link" href="#" data-tab="commission"><i class="fas fa-coins me-2"></i>Commission</a><?php endif; ?>
+            <?php if ($adminCan('announcements.send')): ?><a class="nav-link" href="#" data-tab="driver-comms"><i class="fas fa-comment-dots me-2"></i>Driver Communication</a><?php endif; ?>
+            <?php if ($adminCan('rides.view')): ?><a class="nav-link" href="#" data-tab="waitlist"><i class="fas fa-users-line me-2"></i>Ride Queue Management</a><?php endif; ?>
+            <?php if ($adminCan('rides.view')): ?><a class="nav-link" href="#" data-tab="ride-requests"><i class="fas fa-hand-point-right me-2"></i>Ride Request Management</a><?php endif; ?>
+            <?php if ($adminCan('premium.view')): ?><a class="nav-link" href="#" data-tab="premium"><i class="fas fa-crown me-2"></i>Premium Features</a><?php endif; ?>
+            <?php if ($adminCan('reports.view')): ?><a class="nav-link" href="#" data-tab="reports"><i class="fas fa-chart-bar me-2"></i>Reports</a><?php endif; ?>
+            <?php if ($adminCan('integrations.view')): ?><a class="nav-link" href="#" data-tab="integrations"><i class="fas fa-plug me-2"></i>Service Integration Center</a><?php endif; ?>
+            <?php if ($adminCan('integrations.view')): ?><a class="nav-link" href="#" data-tab="diagnostics"><i class="fas fa-heart-pulse me-2"></i>Diagnostics</a><?php endif; ?>
+            <?php if ($adminCan('chat.moderate')): ?><a class="nav-link" href="#" data-tab="chat-monitoring"><i class="fas fa-comments me-2"></i>Chat Monitoring</a><?php endif; ?>
+            <?php if ($adminCan('reports.view')): ?><a class="nav-link" href="#" data-tab="community-growth"><i class="fas fa-people-group me-2"></i>Community Growth</a><?php endif; ?>
+            <?php if ($adminCan('network.view')): ?><a class="nav-link" href="#" data-tab="mohtoh-network"><i class="fas fa-share-nodes me-2"></i>MOHTOH NETWORK</a><?php endif; ?>
+
+            <?php if ($adminIsSuper): ?>
+            <div class="text-white-50 text-uppercase small fw-bold px-2 pt-4 pb-1" style="letter-spacing:0.05em;">Administration</div>
+            <a class="nav-link" href="#" data-tab="administrators"><i class="fas fa-user-shield me-2"></i>Administrators</a>
+            <?php endif; ?>
         </nav>
         <div class="mt-5 border-top border-secondary pt-3">
             <button class="btn btn-outline-light btn-sm w-100" onclick="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</button>
@@ -136,10 +185,21 @@ if ($_SESSION['user_type'] !== 'admin') {
                 </div>
             </div>
             <div class="d-flex align-items-center gap-3">
+                <?php if ($adminHasOtherRole): ?>
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-arrow-right-arrow-left me-1"></i>Switch mode</button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><button class="dropdown-item" type="button" onclick="adminSwitchMode('rider')"><i class="fas fa-user me-2"></i>Rider mode</button></li>
+                        <?php if ($adminOtherRole === 'driver'): ?>
+                        <li><button class="dropdown-item" type="button" onclick="adminSwitchMode('driver')"><i class="fas fa-car me-2"></i>Driver mode</button></li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
                 <span class="badge bg-success-subtle text-success"><i class="fas fa-circle me-1"></i>Online</span>
                 <div class="text-end">
-                    <div class="fw-semibold">Administrator</div>
-                    <small class="text-muted">System Operations</small>
+                    <div class="fw-semibold"><?= htmlspecialchars($adminName) ?></div>
+                    <small class="text-muted"><?= $adminIsSuper ? 'Super Admin' : 'Subadmin' ?></small>
                 </div>
             </div>
         </header>
@@ -1009,6 +1069,50 @@ if ($_SESSION['user_type'] !== 'admin') {
                         <div class="alert mt-2 d-none" id="pay-test-alert"></div>
                     </div>
                 </div>
+
+                <div class="card shadow-sm border-0 form-card mt-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-1"><i class="fab fa-google me-2"></i>Continue with Google (OAuth) <span class="badge bg-secondary align-middle ms-1" id="google-oauth-status">Loading…</span></h5>
+                        <p class="text-muted small mb-3">Lets users sign in with their Google account using the secure OAuth 2.0 <strong>authorization-code</strong> flow (no tokens ever touch the browser). The <strong>Enable</strong> switch controls BOTH the button on the login screen AND the backend authorize/callback — when off, the flow is rejected server-side, not merely hidden. The <strong>Client Secret is encrypted at rest and never returned to the browser</strong> (only a masked preview is shown; leave it blank to keep the saved value). Register the exact <strong>Redirect URI</strong> below in Google Cloud → APIs &amp; Services → Credentials → your OAuth 2.0 Client ID.</p>
+                        <div class="alert d-none" id="google-oauth-alert"></div>
+                        <form id="google-oauth-form">
+                            <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="goog-enabled"><label class="form-check-label" for="goog-enabled">Enable Continue with Google</label></div>
+                            <div class="row g-3">
+                                <div class="col-md-12"><label class="form-label">Client ID</label><input type="text" class="form-control" id="goog-client_id" placeholder="xxxxxxxx.apps.googleusercontent.com"><div class="form-text">The OAuth 2.0 Client ID from Google Cloud. Public by design — safe to store in the clear.</div></div>
+                                <div class="col-md-12"><label class="form-label">Client Secret <span class="text-muted small" id="goog-client_secret-status"></span></label><input type="password" class="form-control" id="goog-client_secret" placeholder="Leave blank to keep the current secret"><div class="form-text">Server-side only — stored encrypted, never returned to the browser.</div></div>
+                                <div class="col-md-12"><label class="form-label">Redirect URI</label><input type="text" class="form-control" id="goog-redirect_uri" placeholder="https://your-domain/auth/oauth/google/callback.php"><div class="form-text">Must EXACTLY match an Authorized redirect URI in Google Cloud. Default for this deployment: <code id="goog-redirect_uri-default"></code> · <a href="#" id="goog-redirect_uri-reset">use default</a></div></div>
+                            </div>
+                            <button class="btn btn-primary mt-3" type="submit">Save Google Settings</button>
+                        </form>
+                        <hr class="my-4">
+                        <h6 class="fw-bold mb-2">Test Configuration</h6>
+                        <p class="text-muted small mb-2">Verifies the saved Client ID/Secret against Google without performing any real login. <strong>No user is signed in and no token is issued.</strong></p>
+                        <button class="btn btn-outline-primary" type="button" id="goog-test-btn">Test Configuration</button>
+                        <div class="alert mt-2 d-none" id="goog-test-alert"></div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 form-card mt-4">
+                    <div class="card-body">
+                        <h5 class="fw-bold mb-1"><i class="fab fa-facebook me-2"></i>Continue with Facebook (OAuth) <span class="badge bg-secondary align-middle ms-1" id="facebook-oauth-status">Loading…</span></h5>
+                        <p class="text-muted small mb-3">Lets users sign in with Facebook (Meta Login) using the secure OAuth 2.0 <strong>authorization-code</strong> flow. The <strong>Enable</strong> switch controls BOTH the login-screen button AND the backend authorize/callback — a disabled provider is rejected server-side. The <strong>App Secret is encrypted at rest and never returned to the browser</strong> (masked preview only; leave blank to keep the saved value). Register the exact <strong>Redirect URI</strong> below as a Valid OAuth Redirect URI under Meta for Developers → your App → Facebook Login → Settings. Note: MohToh treats a Facebook email as <em>unverified</em>, so it never auto-matches an existing account by email alone.</p>
+                        <div class="alert d-none" id="facebook-oauth-alert"></div>
+                        <form id="facebook-oauth-form">
+                            <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="fb-enabled"><label class="form-check-label" for="fb-enabled">Enable Continue with Facebook</label></div>
+                            <div class="row g-3">
+                                <div class="col-md-12"><label class="form-label">App ID</label><input type="text" class="form-control" id="fb-client_id" placeholder="Your Meta App ID (numeric)"><div class="form-text">The App ID from Meta for Developers. Public by design — safe to store in the clear.</div></div>
+                                <div class="col-md-12"><label class="form-label">App Secret <span class="text-muted small" id="fb-client_secret-status"></span></label><input type="password" class="form-control" id="fb-client_secret" placeholder="Leave blank to keep the current secret"><div class="form-text">Server-side only — stored encrypted, never returned to the browser.</div></div>
+                                <div class="col-md-12"><label class="form-label">Redirect URI</label><input type="text" class="form-control" id="fb-redirect_uri" placeholder="https://your-domain/auth/oauth/facebook/callback.php"><div class="form-text">Must EXACTLY match a Valid OAuth Redirect URI in your Meta app. Default for this deployment: <code id="fb-redirect_uri-default"></code> · <a href="#" id="fb-redirect_uri-reset">use default</a></div></div>
+                            </div>
+                            <button class="btn btn-primary mt-3" type="submit">Save Facebook Settings</button>
+                        </form>
+                        <hr class="my-4">
+                        <h6 class="fw-bold mb-2">Test Configuration</h6>
+                        <p class="text-muted small mb-2">Verifies the saved App ID/Secret against Facebook (an app-token check) without performing any real login. <strong>No user is signed in.</strong></p>
+                        <button class="btn btn-outline-primary" type="button" id="fb-test-btn">Test Configuration</button>
+                        <div class="alert mt-2 d-none" id="fb-test-alert"></div>
+                    </div>
+                </div>
             </section>
                 <div class="card shadow-sm border-0 form-card">
                     <div class="card-body">
@@ -1179,6 +1283,226 @@ if ($_SESSION['user_type'] !== 'admin') {
                     </div>
                 </div>
             </section>
+
+            <?php if ($adminCan('network.view')): ?>
+            <section id="tab-mohtoh-network" class="tab-pane">
+                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <div>
+                        <h5 class="fw-bold mb-0"><i class="fas fa-share-nodes me-2"></i>MOHTOH NETWORK</h5>
+                        <small class="text-muted">Share the Journey. Create Opportunity. — direct referral &amp; revenue-share programme.</small>
+                    </div>
+                    <ul class="nav nav-pills" id="net-subtabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" data-netsub="overview">Overview</a></li>
+                        <?php if ($adminIsSuper): ?><li class="nav-item"><a class="nav-link" href="#" data-netsub="settings">Settings</a></li><?php endif; ?>
+                        <?php if ($adminCan('network.partners.manage') || $adminCan('network.view')): ?><li class="nav-item"><a class="nav-link" href="#" data-netsub="partners">Partners</a></li><?php endif; ?>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="referrals">Referrals</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="rewards">Rewards</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="withdrawals">Withdrawals</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" data-netsub="fraud">Fraud</a></li>
+                    </ul>
+                </div>
+                <div class="alert d-none" id="net-alert"></div>
+
+                <div class="net-subtab" id="net-sub-overview">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Network Partners</div><h3 class="fw-bold mb-0" id="net-ov-partners">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Pending Approval</div><h3 class="fw-bold mb-0" id="net-ov-pending">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Active Referrals</div><h3 class="fw-bold mb-0" id="net-ov-active-referrals">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Converted (1st ride)</div><h3 class="fw-bold mb-0" id="net-ov-converted">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Open Fraud Flags</div><h3 class="fw-bold mb-0" id="net-ov-fraud">0</h3></div></div>
+                        <div class="col-md-4 col-xl-2"><div class="card stat-card p-3"><div class="text-muted small">Withdrawals Paid</div><h3 class="fw-bold mb-0" id="net-ov-withdrawn">₦0</h3></div></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0"><div class="card-body">
+                                <h6 class="fw-bold mb-3">Reward liability</h6>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Total generated</span><strong id="net-ov-generated">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Pending (on hold)</span><strong id="net-ov-rpending">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Available for withdrawal</span><strong id="net-ov-ravailable">₦0</strong></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted">Reversed</span><strong id="net-ov-rreversed">₦0</strong></div>
+                            </div></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0"><div class="card-body">
+                                <h6 class="fw-bold mb-3">Net contribution</h6>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Referral-generated commission</span><strong id="net-ov-commission">₦0</strong></div>
+                                <div class="d-flex justify-content-between mb-2"><span class="text-muted">Minus rewards generated</span><strong id="net-ov-generated2">₦0</strong></div>
+                                <div class="d-flex justify-content-between"><span class="text-muted">= Net contribution</span><strong id="net-ov-net" class="text-success">₦0</strong></div>
+                            </div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <?php if ($adminIsSuper): ?>
+                <div class="net-subtab d-none" id="net-sub-settings">
+                    <div class="card shadow-sm border-0 mb-4"><div class="card-body">
+                        <h6 class="fw-bold mb-3">Programme switches</h6>
+                        <form id="net-settings-form" class="row g-3">
+                            <div class="col-md-3"><label class="form-label">MOHTOH NETWORK enabled</label><select class="form-select form-select-sm" id="net-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">New partner registrations</label><select class="form-select form-select-sm" id="net-registrations-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Referral links</label><select class="form-select form-select-sm" id="net-links-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Reward generation</label><select class="form-select form-select-sm" id="net-rewards-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Withdrawals</label><select class="form-select form-select-sm" id="net-withdrawals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Driver referral rewards</label><select class="form-select form-select-sm" id="net-driver-referrals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Passenger referral rewards</label><select class="form-select form-select-sm" id="net-passenger-referrals-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">External partner participation</label><select class="form-select form-select-sm" id="net-external-partners-enabled"><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Maintenance mode</label><select class="form-select form-select-sm" id="net-maintenance-mode"><option value="0">Off</option><option value="1">On</option></select></div>
+                            <div class="col-md-3"><label class="form-label text-danger">Emergency: suspend ALL payouts</label><select class="form-select form-select-sm" id="net-emergency-payout-suspended"><option value="0">Off</option><option value="1">Suspended</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Auto-approve new partners</label><select class="form-select form-select-sm" id="net-partner-auto-approve"><option value="0">Manual review</option><option value="1">Auto-approve</option></select></div>
+                            <div class="col-md-3"><label class="form-label">Programme launch date</label><input type="datetime-local" class="form-control form-control-sm" id="net-launch-at"></div>
+                            <div class="col-md-3"><label class="form-label">Programme closing date</label><input type="datetime-local" class="form-control form-control-sm" id="net-closes-at"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Reward configuration</h6>
+                            <div class="col-md-3"><label class="form-label">Driver referral reward (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-driver-reward-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Passenger referral reward (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-passenger-reward-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Combined reward ceiling (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-combined-ceiling-pct"></div>
+                            <div class="col-md-3"><label class="form-label">Earning duration (days)</label><input type="number" min="1" class="form-control form-control-sm" id="net-earning-days"></div>
+                            <div class="col-md-3"><label class="form-label">Minimum withdrawal (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-min-withdrawal"></div>
+                            <div class="col-md-3"><label class="form-label">Registration bonus (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-registration-bonus"></div>
+                            <div class="col-md-3"><label class="form-label">Reward holding period (days)</label><input type="number" min="0" class="form-control form-control-sm" id="net-reward-hold-days"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Financial controls <span class="text-muted small fw-normal">(0 = unlimited)</span></h6>
+                            <div class="col-md-3"><label class="form-label">Total reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-total-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Daily reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-daily-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Monthly reward budget (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-monthly-budget"></div>
+                            <div class="col-md-3"><label class="form-label">Max combined payout/txn (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-combined-payout-per-txn"></div>
+                            <div class="col-md-3"><label class="form-label">Max withdrawal/day (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-withdrawal-per-day"></div>
+                            <div class="col-md-3"><label class="form-label">Max withdrawal/month (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-max-withdrawal-per-month"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Fraud thresholds <span class="text-muted small fw-normal">(flags only — never auto-blocks)</span></h6>
+                            <div class="col-md-4"><label class="form-label">Max new referrals / partner / day</label><input type="number" min="0" class="form-control form-control-sm" id="net-fraud-velocity-max"></div>
+                            <div class="col-md-4"><label class="form-label">Max rewarded bookings / same driver-rider pair</label><input type="number" min="0" class="form-control form-control-sm" id="net-fraud-same-pair-max"></div>
+
+                            <div class="col-12"><hr></div>
+                            <h6 class="fw-bold">Transparency</h6>
+                            <div class="col-md-6"><label class="form-label">Announcement banner</label><input type="text" class="form-control form-control-sm" id="net-announcement" placeholder="Shown to partners on their dashboard"></div>
+                            <div class="col-md-2"><label class="form-label">Terms version</label><input type="text" class="form-control form-control-sm" id="net-terms-version"></div>
+                            <div class="col-md-12"><label class="form-label">Programme terms &amp; conditions</label><textarea class="form-control form-control-sm" id="net-terms-text" rows="4"></textarea></div>
+
+                            <div class="col-12"><button type="submit" class="btn btn-primary">Save MOHTOH NETWORK Settings</button></div>
+                        </form>
+                    </div></div>
+
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">Campaigns</h6>
+                            <button class="btn btn-outline-primary btn-sm" type="button" id="net-new-campaign-btn">New Campaign</button>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Name</th><th>Driver %</th><th>Passenger %</th><th>Ceiling %</th><th>Window</th><th>Status</th><th></th></tr></thead>
+                            <tbody id="net-campaigns-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                    </div></div>
+                </div>
+                <?php endif; ?>
+
+                <div class="net-subtab d-none" id="net-sub-partners">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4"><input type="text" class="form-control form-control-sm" id="net-p-q" placeholder="Search name, phone, email or code"></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-p-status"><option value="">Any status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="suspended">Suspended</option><option value="rejected">Rejected</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-p-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Partner</th><th>Code</th><th>Status</th><th>Referrals</th><th>Lifetime Rewards</th><th>Joined</th><th></th></tr></thead>
+                            <tbody id="net-partners-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-partners-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-referrals">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><input type="text" class="form-control form-control-sm" id="net-r-q" placeholder="Search referrer or referred"></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-r-category"><option value="">Any category</option><option value="driver">Driver</option><option value="passenger">Passenger</option></select></div>
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-r-status"><option value="">Any status</option><option value="registered">Registered</option><option value="verified">Verified</option><option value="active">Active (earning)</option><option value="expired">Expired</option><option value="cancelled">Cancelled</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-r-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Referrer</th><th>Referred</th><th>Category</th><th>Status</th><th>Earning window</th><th>Qualifying rides</th><th>Rewards</th><th></th></tr></thead>
+                            <tbody id="net-referrals-body"><tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-referrals-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-rewards">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <!-- No "Withdrawn"/"Suspended" options: a reward row's own status never
+                                 reaches either value today — withdrawal draws from the aggregate
+                                 available pool (see docs/mohtoh-network.md), and no reward-level
+                                 suspend action exists yet (only partner-level suspension does).
+                                 Listing them here would silently always return zero rows. -->
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-rw-status"><option value="">Any status</option><option value="pending">Pending</option><option value="available">Available</option><option value="reversed">Reversed</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-rw-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Beneficiary</th><th>Role</th><th>Commission base</th><th>%</th><th>Reward</th><th>Status</th><th>Created</th><th></th></tr></thead>
+                            <tbody id="net-rewards-body"><tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-rewards-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-withdrawals">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-w-status"><option value="">Any status</option><option value="pending">Pending</option><option value="under_review">Under review</option><option value="approved">Approved</option><option value="processing">Processing</option><option value="paid">Paid</option><option value="rejected">Rejected</option><option value="failed">Failed</option><option value="reversed">Reversed</option></select></div>
+                            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" type="button" id="net-w-export"><i class="fas fa-file-csv me-1"></i>Export CSV</button></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>Partner</th><th>Amount</th><th>Bank</th><th>Status</th><th>Requested</th><th>Reference</th><th></th></tr></thead>
+                            <tbody id="net-withdrawals-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-withdrawals-pagination"></div>
+                    </div></div>
+                </div>
+
+                <div class="net-subtab d-none" id="net-sub-fraud">
+                    <div class="card shadow-sm border-0"><div class="card-body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3"><select class="form-select form-select-sm" id="net-f-status"><option value="">Any status</option><option value="open">Open</option><option value="reviewing">Reviewing</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+                            <thead><tr><th>User</th><th>Flag</th><th>Severity</th><th>Details</th><th>Status</th><th>Raised</th><th></th></tr></thead>
+                            <tbody id="net-fraud-body"><tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                        </table></div>
+                        <div id="net-fraud-pagination"></div>
+                    </div></div>
+                </div>
+            </section>
+            <?php endif; ?>
+
+            <?php if ($adminIsSuper): ?>
+            <section id="tab-administrators" class="tab-pane">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h5 class="fw-bold mb-0"><i class="fas fa-user-shield me-2"></i>Administrators</h5>
+                        <small class="text-muted">Create and manage Subadmins and their permissions. Super Admin only — every action is server-enforced and audited.</small>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-outline-primary btn-sm" type="button" onclick="openPromoteExisting()"><i class="fas fa-user-plus me-1"></i>Add Existing User</button>
+                        <button class="btn btn-primary btn-sm" type="button" onclick="openCreateSubadmin()"><i class="fas fa-plus me-1"></i>Create Subadmin</button>
+                    </div>
+                </div>
+                <div class="alert d-none" id="admins-alert"></div>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>Status</th><th>Permissions</th><th>Actions</th></tr></thead>
+                                <tbody id="admins-body"><tr><td colspan="6" class="text-muted text-center py-3">Loading…</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <?php endif; ?>
         </div>
     </main>
 </div>
@@ -1208,7 +1532,39 @@ if ($_SESSION['user_type'] !== 'admin') {
     </div>
 </div>
 
+<?php if ($adminIsSuper): ?>
+<div class="modal fade" id="adminMgmtModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminMgmtModalTitle">Subadmin</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="adminMgmtModalBody"></div>
+            <div class="modal-footer">
+                <div class="me-auto small" id="adminMgmtModalMsg"></div>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="adminMgmtSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script>
+// Emitted for the browser purely so client code can hide controls it has no
+// permission for; it is NEVER the authorization — every admin endpoint
+// re-checks server-side (includes/admin_permissions.php). Encoded with
+// JSON_HEX_* so a crafted name can't break out of this inline script.
+window.ADMIN_CTX = <?= json_encode([
+    'is_super'    => $adminIsSuper,
+    'name'        => $adminName,
+    'permissions' => array_keys($adminCtx['permissions']),
+], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../assets/js/image-viewer.js"></script>
 <script>
     // Admin live-tracking map — Google Maps. The browser key is fetched
     // from api/maps-key.php (Integration Center → maps-key.php → here); it
@@ -1235,6 +1591,19 @@ if ($_SESSION['user_type'] !== 'admin') {
         document.getElementById('mi-test-btn').addEventListener('click', testMaps);
         document.getElementById('payment-integration-form').addEventListener('submit', handlePaymentIntegrationSubmit);
         document.getElementById('pay-test-btn').addEventListener('click', testPayment);
+        OAUTH_CARDS.forEach(cfg => {
+            const form = document.getElementById(cfg.form);
+            if (form) form.addEventListener('submit', (e) => handleOAuthSubmit(cfg, e));
+            const tbtn = document.getElementById(cfg.prefix + '-test-btn');
+            if (tbtn) tbtn.addEventListener('click', () => testOAuth(cfg));
+            const reset = document.getElementById(cfg.prefix + '-redirect_uri-reset');
+            if (reset) reset.addEventListener('click', (e) => {
+                e.preventDefault();
+                const def = document.getElementById(cfg.prefix + '-redirect_uri-default');
+                const inp = document.getElementById(cfg.prefix + '-redirect_uri');
+                if (def && inp) inp.value = def.textContent || '';
+            });
+        });
         document.getElementById('diag-refresh-btn').addEventListener('click', loadDiagnostics);
         document.getElementById('chat-search-btn').addEventListener('click', searchChatConversations);
         document.getElementById('chat-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); searchChatConversations(); } });
@@ -1245,6 +1614,23 @@ if ($_SESSION['user_type'] !== 'admin') {
         document.getElementById('cg-filter-status').addEventListener('change', () => loadReferralsList(1));
         document.getElementById('cg-prev-page').addEventListener('click', () => loadReferralsList(Math.max(1, cgCurrentPage - 1)));
         document.getElementById('cg-next-page').addEventListener('click', () => loadReferralsList(cgCurrentPage + 1));
+        document.querySelectorAll('#net-subtabs .nav-link').forEach(link => link.addEventListener('click', e => { e.preventDefault(); switchNetworkSubtab(link.dataset.netsub); }));
+        const netSettingsForm = document.getElementById('net-settings-form');
+        if (netSettingsForm) netSettingsForm.addEventListener('submit', handleNetworkSettingsSubmit);
+        const netNewCampaignBtn = document.getElementById('net-new-campaign-btn');
+        if (netNewCampaignBtn) netNewCampaignBtn.addEventListener('click', createNetworkCampaign);
+        ['net-p-q', 'net-p-status'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id.endsWith('-q') ? 'input' : 'change', debounce(() => loadNetworkPartners(1), 300)); });
+        ['net-r-q', 'net-r-category', 'net-r-status'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener(id.endsWith('-q') ? 'input' : 'change', debounce(() => loadNetworkReferrals(1), 300)); });
+        const netRwStatus = document.getElementById('net-rw-status');
+        if (netRwStatus) netRwStatus.addEventListener('change', () => loadNetworkRewards(1));
+        const netWStatus = document.getElementById('net-w-status');
+        if (netWStatus) netWStatus.addEventListener('change', () => loadNetworkWithdrawals(1));
+        const netFStatus = document.getElementById('net-f-status');
+        if (netFStatus) netFStatus.addEventListener('change', () => loadNetworkFraud(1));
+        document.getElementById('net-p-export')?.addEventListener('click', exportNetworkPartnersCsv);
+        document.getElementById('net-r-export')?.addEventListener('click', exportNetworkReferralsCsv);
+        document.getElementById('net-rw-export')?.addEventListener('click', exportNetworkRewardsCsv);
+        document.getElementById('net-w-export')?.addEventListener('click', exportNetworkWithdrawalsCsv);
 
         // Part 1 — sidebar collapse (desktop) / off-canvas (mobile).
         const sidebarEl = document.getElementById('adminSidebar');
@@ -1262,7 +1648,7 @@ if ($_SESSION['user_type'] !== 'admin') {
     // Tabs that lazy-load their data the first time they're opened, rather
     // than on every 15s dashboard poll — none of this data changes as
     // often as the live dashboard/map does.
-    const TAB_LOADERS = { pricing: loadPricingCenter, 'driver-settings': loadDriverSettingsTab, 'regional-pricing': loadRegions, promotions: loadPromotions, commission: loadCommissionReport, 'driver-comms': loadDriverCommsTab, reports: () => loadReport('daily'), integrations: loadIntegrationCenter, notifications: loadNotificationCenter, diagnostics: loadDiagnostics, 'chat-monitoring': loadChatMonitoring, waitlist: loadWaitlistCenter, premium: loadPremiumCenter, 'community-growth': loadCommunityGrowthTab, 'ride-requests': loadRideRequestsCenter };
+    const TAB_LOADERS = { pricing: loadPricingCenter, 'driver-settings': loadDriverSettingsTab, 'regional-pricing': loadRegions, promotions: loadPromotions, commission: loadCommissionReport, 'driver-comms': loadDriverCommsTab, reports: () => loadReport('daily'), integrations: loadIntegrationCenter, notifications: loadNotificationCenter, diagnostics: loadDiagnostics, 'chat-monitoring': loadChatMonitoring, waitlist: loadWaitlistCenter, premium: loadPremiumCenter, 'community-growth': loadCommunityGrowthTab, 'ride-requests': loadRideRequestsCenter, administrators: loadAdminsTab, 'mohtoh-network': loadNetworkTab };
     const loadedTabs = new Set();
     function switchTab(tabName) { document.querySelectorAll('.tab-pane').forEach(tab => tab.classList.remove('active')); document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active')); document.getElementById(`tab-${tabName}`).classList.add('active'); document.querySelector(`.sidebar .nav-link[data-tab="${tabName}"]`).classList.add('active'); if (TAB_LOADERS[tabName] && !loadedTabs.has(tabName)) { loadedTabs.add(tabName); TAB_LOADERS[tabName](); } }
     // ---- Chat Monitoring (Task 5) — reuses toggleUserAccess()/sendAction() and #detailModal, no new admin page ----
@@ -1359,6 +1745,353 @@ if ($_SESSION['user_type'] !== 'admin') {
         document.getElementById('cg-prev-page').disabled = page <= 1;
         document.getElementById('cg-next-page').disabled = page >= totalPages;
     }
+    // ---- MOHTOH NETWORK (admin tab, Phase 3) ----
+    function debounce(fn, delay) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; }
+    const netLoadedSubtabs = new Set();
+    function switchNetworkSubtab(name) {
+        document.querySelectorAll('#net-subtabs .nav-link').forEach(l => l.classList.remove('active'));
+        const navLink = document.querySelector(`#net-subtabs .nav-link[data-netsub="${name}"]`);
+        if (navLink) navLink.classList.add('active');
+        document.querySelectorAll('.net-subtab').forEach(el => el.classList.add('d-none'));
+        const pane = document.getElementById(`net-sub-${name}`);
+        if (pane) pane.classList.remove('d-none');
+        if (!netLoadedSubtabs.has(name) && NET_SUBTAB_LOADERS[name]) {
+            netLoadedSubtabs.add(name);
+            NET_SUBTAB_LOADERS[name]();
+        }
+    }
+    const NET_SUBTAB_LOADERS = {
+        overview: loadNetworkOverview, settings: loadNetworkSettings,
+        partners: () => loadNetworkPartners(1), referrals: () => loadNetworkReferrals(1),
+        rewards: () => loadNetworkRewards(1), withdrawals: () => loadNetworkWithdrawals(1), fraud: () => loadNetworkFraud(1),
+    };
+    async function loadNetworkTab() { await loadNetworkOverview(); netLoadedSubtabs.add('overview'); }
+    function netAlert(res) { showTabAlert('net-alert', res); }
+    function netCanManage(perm) { return !!(window.ADMIN_CTX && (ADMIN_CTX.is_super || ADMIN_CTX.permissions.includes(perm))); }
+
+    async function loadNetworkOverview() {
+        const res = await fetch('../api/network-admin.php?action=overview');
+        const data = await res.json();
+        if (data.status !== 'success') return;
+        const { partners, referrals, rewards, withdrawals, open_fraud_flags } = data.data;
+        document.getElementById('net-ov-partners').textContent = partners.total_partners || 0;
+        document.getElementById('net-ov-pending').textContent = partners.pending_partners || 0;
+        document.getElementById('net-ov-active-referrals').textContent = referrals.active_referrals || 0;
+        document.getElementById('net-ov-converted').textContent = referrals.converted_referrals || 0;
+        document.getElementById('net-ov-fraud').textContent = open_fraud_flags || 0;
+        document.getElementById('net-ov-withdrawn').textContent = '₦' + Number(withdrawals.total_paid).toLocaleString();
+        document.getElementById('net-ov-generated').textContent = '₦' + Number(rewards.total_generated).toLocaleString();
+        document.getElementById('net-ov-rpending').textContent = '₦' + Number(rewards.total_pending).toLocaleString();
+        document.getElementById('net-ov-ravailable').textContent = '₦' + Number(rewards.total_available).toLocaleString();
+        document.getElementById('net-ov-rreversed').textContent = '₦' + Number(rewards.total_reversed).toLocaleString();
+        document.getElementById('net-ov-commission').textContent = '₦' + Number(rewards.referral_generated_commission).toLocaleString();
+        document.getElementById('net-ov-generated2').textContent = '₦' + Number(rewards.total_generated).toLocaleString();
+        document.getElementById('net-ov-net').textContent = '₦' + Number(rewards.referral_generated_commission - rewards.total_generated).toLocaleString();
+    }
+
+    // Settings — one flat map of <input id> -> system_settings key, same
+    // shape the Community Growth form above uses, just larger. Only
+    // rendered for Super Admins (the programme/financial-control fields),
+    // so every lookup here is null-guarded.
+    const NET_SETTING_FIELDS = {
+        'net-enabled': 'network_enabled', 'net-registrations-enabled': 'network_registrations_enabled',
+        'net-links-enabled': 'network_links_enabled', 'net-rewards-enabled': 'network_rewards_enabled',
+        'net-withdrawals-enabled': 'network_withdrawals_enabled', 'net-driver-referrals-enabled': 'network_driver_referrals_enabled',
+        'net-passenger-referrals-enabled': 'network_passenger_referrals_enabled', 'net-external-partners-enabled': 'network_external_partners_enabled',
+        'net-maintenance-mode': 'network_maintenance_mode', 'net-emergency-payout-suspended': 'network_emergency_payout_suspended',
+        'net-partner-auto-approve': 'network_partner_auto_approve', 'net-launch-at': 'network_launch_at', 'net-closes-at': 'network_closes_at',
+        'net-driver-reward-pct': 'network_driver_reward_pct', 'net-passenger-reward-pct': 'network_passenger_reward_pct',
+        'net-combined-ceiling-pct': 'network_combined_ceiling_pct', 'net-earning-days': 'network_earning_days',
+        'net-min-withdrawal': 'network_min_withdrawal', 'net-registration-bonus': 'network_registration_bonus',
+        'net-reward-hold-days': 'network_reward_hold_days', 'net-total-budget': 'network_total_budget',
+        'net-daily-budget': 'network_daily_budget', 'net-monthly-budget': 'network_monthly_budget',
+        'net-max-combined-payout-per-txn': 'network_max_combined_payout_per_txn', 'net-max-withdrawal-per-day': 'network_max_withdrawal_per_day',
+        'net-max-withdrawal-per-month': 'network_max_withdrawal_per_month',
+        'net-fraud-velocity-max': 'network_fraud_velocity_max_per_day', 'net-fraud-same-pair-max': 'network_fraud_same_pair_max_rewards',
+        'net-announcement': 'network_announcement',
+        'net-terms-version': 'network_terms_version', 'net-terms-text': 'network_terms_text',
+    };
+    async function loadNetworkSettings() {
+        const res = await fetch('../api/network-admin.php?action=settings');
+        const data = await res.json();
+        if (data.status !== 'success') return;
+        const s = data.data.settings;
+        Object.entries(NET_SETTING_FIELDS).forEach(([elId, key]) => { const el = document.getElementById(elId); if (el) el.value = s[key] ?? ''; });
+        await loadNetworkCampaigns();
+    }
+    async function handleNetworkSettingsSubmit(e) {
+        e.preventDefault();
+        const settings = {};
+        Object.entries(NET_SETTING_FIELDS).forEach(([elId, key]) => { const el = document.getElementById(elId); if (el) settings[key] = el.value; });
+        const res = await postJsonCsrf('../api/network-admin.php?action=update_settings', { settings });
+        netAlert(res);
+    }
+    async function loadNetworkCampaigns() {
+        const res = await fetch('../api/network-admin.php?action=campaigns');
+        const data = await res.json();
+        const body = document.getElementById('net-campaigns-body');
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const campaigns = data.data.campaigns || [];
+        body.innerHTML = campaigns.length ? campaigns.map(c => `<tr>
+            <td>${escapeHtml(c.name)}</td><td>${c.driver_reward_pct ?? '—'}</td><td>${c.passenger_reward_pct ?? '—'}</td><td>${c.combined_ceiling_pct ?? '—'}</td>
+            <td class="small">${c.starts_at ? new Date(c.starts_at).toLocaleDateString() : '—'} → ${c.ends_at ? new Date(c.ends_at).toLocaleDateString() : '—'}</td>
+            <td><span class="badge ${c.status === 'active' ? 'bg-success' : (['ended', 'cancelled'].includes(c.status) ? 'bg-secondary' : 'bg-info')}">${escapeHtml(c.status)}</span></td>
+            <td>${!['ended', 'cancelled'].includes(c.status) ? `<button class="btn btn-sm btn-outline-danger" onclick="endNetworkCampaign(${c.id})">End</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No campaigns yet.</td></tr>';
+    }
+    async function createNetworkCampaign() {
+        const name = prompt('Campaign name:');
+        if (!name) return;
+        const driverPct = prompt('Driver reward % for this campaign (blank = use the default setting):', '') || '';
+        const passengerPct = prompt('Passenger reward % for this campaign (blank = use the default setting):', '') || '';
+        const startsAt = prompt('Start (YYYY-MM-DD HH:MM):');
+        const endsAt = prompt('End (YYYY-MM-DD HH:MM):');
+        if (!startsAt || !endsAt) { alert('Start and end are required.'); return; }
+        const res = await postJsonCsrf('../api/network-admin.php?action=create_campaign', { name, driver_reward_pct: driverPct, passenger_reward_pct: passengerPct, starts_at: startsAt, ends_at: endsAt });
+        if (res.status === 'success') loadNetworkCampaigns(); else alert(res.message || 'Failed to create campaign');
+    }
+    async function endNetworkCampaign(id) {
+        if (!confirm('End this campaign now?')) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=end_campaign', { campaign_id: id });
+        if (res.status === 'success') loadNetworkCampaigns(); else alert(res.message || 'Failed to end campaign');
+    }
+
+    // Partners
+    const NET_PARTNER_BADGE = { pending: 'bg-warning text-dark', approved: 'bg-success', suspended: 'bg-danger', rejected: 'bg-secondary' };
+    function netPartnerActionButtons(p) {
+        if (p.status === 'pending') return `<button class="btn btn-sm btn-outline-success mb-1" onclick="approveNetworkPartner(${p.id})">Approve</button>`;
+        if (p.status === 'approved') return `<button class="btn btn-sm btn-outline-danger mb-1" onclick="suspendNetworkPartner(${p.id})">Suspend</button>`;
+        if (p.status === 'suspended') return `<button class="btn btn-sm btn-outline-success mb-1" onclick="reactivateNetworkPartner(${p.id})">Reactivate</button>`;
+        return '';
+    }
+    async function loadNetworkPartners(page) {
+        const params = new URLSearchParams({ action: 'partners', page, limit: 20 });
+        const q = document.getElementById('net-p-q').value.trim();
+        const status = document.getElementById('net-p-status').value;
+        if (q) params.set('q', q);
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-partners-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const partners = data.data.partners || [];
+        const canManage = netCanManage('network.partners.manage');
+        body.innerHTML = partners.length ? partners.map(p => `<tr>
+            <td>${escapeHtml(p.fullname)} <span class="text-muted small">${escapeHtml(p.public_user_id || '')}</span><br><span class="text-muted small text-capitalize">${escapeHtml(p.user_type)}</span></td>
+            <td><code>${escapeHtml(p.referral_code)}</code></td>
+            <td><span class="badge ${NET_PARTNER_BADGE[p.status] || 'bg-secondary'}">${escapeHtml(p.status)}</span>${p.status === 'suspended' && p.suspension_reason ? `<div class="small text-muted">${escapeHtml(p.suspension_reason)}</div>` : ''}</td>
+            <td>${p.total_referrals}</td>
+            <td>₦${Number(p.lifetime_rewards).toLocaleString()}</td>
+            <td class="small text-muted">${p.joined_at ? new Date(p.joined_at).toLocaleDateString() : ''}</td>
+            <td>${canManage ? netPartnerActionButtons(p) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No partners match these filters.</td></tr>';
+        renderPagination('net-partners-pagination', data.pagination, loadNetworkPartners);
+    }
+    async function approveNetworkPartner(id) { const res = await postJsonCsrf('../api/network-admin.php?action=approve_partner', { partner_id: id }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+    async function suspendNetworkPartner(id) { const reason = prompt('Reason for suspension (required, shown to the partner):'); if (!reason) return; const res = await postJsonCsrf('../api/network-admin.php?action=suspend_partner', { partner_id: id, reason }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+    async function reactivateNetworkPartner(id) { const res = await postJsonCsrf('../api/network-admin.php?action=reactivate_partner', { partner_id: id }); if (res.status === 'success') loadNetworkPartners(1); else alert(res.message || 'Failed'); }
+
+    // Referrals
+    const NET_REFERRAL_BADGE = { registered: 'bg-secondary', verified: 'bg-info', active: 'bg-success', expired: 'bg-dark', cancelled: 'bg-danger', legacy_migrated: 'bg-light text-dark' };
+    async function loadNetworkReferrals(page) {
+        const params = new URLSearchParams({ action: 'referrals', page, limit: 20 });
+        const q = document.getElementById('net-r-q').value.trim();
+        const category = document.getElementById('net-r-category').value;
+        const status = document.getElementById('net-r-status').value;
+        if (q) params.set('q', q);
+        if (category) params.set('category', category);
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-referrals-body');
+        body.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const referrals = data.data.referrals || [];
+        const canManage = netCanManage('network.partners.manage');
+        body.innerHTML = referrals.length ? referrals.map(r => `<tr>
+            <td>${escapeHtml(r.referrer_name)} <span class="text-muted small">${escapeHtml(r.referrer_public_id || '')}</span></td>
+            <td>${escapeHtml(r.referred_name)} <span class="text-muted small">${escapeHtml(r.referred_public_id || '')}</span></td>
+            <td class="text-capitalize">${escapeHtml(r.referred_category)}</td>
+            <td><span class="badge ${NET_REFERRAL_BADGE[r.status] || 'bg-secondary'}">${escapeHtml(r.status.replace('_', ' '))}</span></td>
+            <td class="small">${r.earning_starts_at ? (new Date(r.earning_starts_at).toLocaleDateString() + ' → ' + new Date(r.earning_expires_at).toLocaleDateString()) : '—'}</td>
+            <td>${r.qualifying_ride_count}</td>
+            <td>₦${Number(r.total_rewards_generated).toLocaleString()}</td>
+            <td>${canManage && !r.attribution_locked_at ? `<button class="btn btn-sm btn-outline-secondary mb-1" onclick="correctNetworkAttribution(${r.id})">Reassign</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No referrals match these filters.</td></tr>';
+        renderPagination('net-referrals-pagination', data.pagination, loadNetworkReferrals);
+    }
+    async function correctNetworkAttribution(referralId) {
+        const newReferrerUserId = prompt('New referrer — their internal user ID (see the Partners/Passengers/Drivers tabs):');
+        if (!newReferrerUserId) return;
+        const reason = prompt('Reason for this correction (required, audited):');
+        if (!reason) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=correct_attribution', { network_referral_id: referralId, new_referrer_user_id: newReferrerUserId, reason });
+        if (res.status === 'success') loadNetworkReferrals(1); else alert(res.message || 'Failed');
+    }
+
+    // Rewards
+    const NET_REWARD_BADGE = { pending: 'bg-warning text-dark', available: 'bg-success', withdrawn: 'bg-primary', reversed: 'bg-danger', suspended: 'bg-secondary' };
+    async function loadNetworkRewards(page) {
+        const params = new URLSearchParams({ action: 'reward_ledger', page, limit: 20 });
+        const status = document.getElementById('net-rw-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-rewards-body');
+        body.innerHTML = '<tr><td colspan="8" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.ledger || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(r => `<tr>
+            <td>${escapeHtml(r.beneficiary_name)} <span class="text-muted small">${escapeHtml(r.beneficiary_public_id || '')}</span></td>
+            <td class="small">${r.beneficiary_role === 'driver_referrer' ? 'Driver referrer' : 'Passenger referrer'}</td>
+            <td>₦${Number(r.commission_base).toLocaleString()}</td>
+            <td>${r.reward_pct}%</td>
+            <td>₦${Number(r.reward_amount).toLocaleString()}</td>
+            <td><span class="badge ${NET_REWARD_BADGE[r.status] || 'bg-secondary'}">${escapeHtml(r.status)}</span>${r.reversal_reason ? `<div class="small text-muted">${escapeHtml(r.reversal_reason)}</div>` : ''}</td>
+            <td class="small text-muted">${r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
+            <td>${canManage && !['reversed', 'withdrawn'].includes(r.status) ? `<button class="btn btn-sm btn-outline-danger mb-1" onclick="reverseNetworkReward(${r.id})">Reverse</button>` : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No rewards match these filters.</td></tr>';
+        renderPagination('net-rewards-pagination', data.pagination, loadNetworkRewards);
+    }
+    async function reverseNetworkReward(ledgerId) {
+        const reason = prompt('Reason for reversing this reward (required, audited):');
+        if (!reason) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=reverse_reward', { ledger_id: ledgerId, reason });
+        if (res.status === 'success') loadNetworkRewards(1); else alert(res.message || 'Failed');
+    }
+
+    // Withdrawals
+    const NET_WITHDRAWAL_BADGE = { pending: 'bg-warning text-dark', under_review: 'bg-info', approved: 'bg-info', processing: 'bg-info', paid: 'bg-success', rejected: 'bg-danger', failed: 'bg-danger', reversed: 'bg-secondary' };
+    function netWithdrawalActionButtons(w) {
+        if (['pending', 'under_review'].includes(w.status)) {
+            return `<button class="btn btn-sm btn-outline-success me-1 mb-1" onclick="decideNetworkWithdrawal(${w.id},'approve')">Approve</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'reject')">Reject</button>`;
+        }
+        if (['approved', 'processing'].includes(w.status)) {
+            return `<button class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="decideNetworkWithdrawal(${w.id},'paid')">Mark Paid</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'failed')">Mark Failed</button>`;
+        }
+        return '';
+    }
+    async function loadNetworkWithdrawals(page) {
+        const params = new URLSearchParams({ action: 'withdrawals', page, limit: 20 });
+        const status = document.getElementById('net-w-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-withdrawals-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.withdrawals || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(w => `<tr>
+            <td>${escapeHtml(w.user_name)} <span class="text-muted small">${escapeHtml(w.public_user_id || '')}</span></td>
+            <td>₦${Number(w.amount).toLocaleString()}</td>
+            <td class="small">${escapeHtml(w.bank_name)} ••${escapeHtml(w.account_number_last4)}<br>${escapeHtml(w.account_name)}</td>
+            <td><span class="badge ${NET_WITHDRAWAL_BADGE[w.status] || 'bg-secondary'}">${escapeHtml(w.status.replace('_', ' '))}</span></td>
+            <td class="small text-muted">${w.requested_at ? new Date(w.requested_at).toLocaleString() : ''}</td>
+            <td class="small">${escapeHtml(w.payment_reference || w.rejection_reason || '—')}</td>
+            <td>${canManage ? netWithdrawalActionButtons(w) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No withdrawals match these filters.</td></tr>';
+        renderPagination('net-withdrawals-pagination', data.pagination, loadNetworkWithdrawals);
+    }
+    async function decideNetworkWithdrawal(id, decision) {
+        let note = null;
+        if (decision === 'paid') { note = prompt('Payment reference (required — proof the transfer was made):'); if (!note) return; }
+        else if (decision === 'reject' || decision === 'failed') { note = prompt('Reason (required, audited):'); if (!note) return; }
+        const res = await postJsonCsrf('../api/network-admin.php?action=decide_withdrawal', { withdrawal_id: id, decision, note });
+        if (res.status === 'success') loadNetworkWithdrawals(1); else alert(res.message || 'Failed');
+    }
+
+    // Fraud
+    const NET_FRAUD_BADGE = { open: 'bg-danger', reviewing: 'bg-warning text-dark', resolved: 'bg-success', dismissed: 'bg-secondary' };
+    function netFraudActionButtons(id) {
+        return `<button class="btn btn-sm btn-outline-success me-1 mb-1" onclick="resolveNetworkFraudFlag(${id},'resolved')">Resolve</button><button class="btn btn-sm btn-outline-secondary mb-1" onclick="resolveNetworkFraudFlag(${id},'dismissed')">Dismiss</button>`;
+    }
+    async function loadNetworkFraud(page) {
+        const params = new URLSearchParams({ action: 'fraud_flags', page, limit: 20 });
+        const status = document.getElementById('net-f-status').value;
+        if (status) params.set('status', status);
+        const body = document.getElementById('net-fraud-body');
+        body.innerHTML = '<tr><td colspan="7" class="text-muted text-center py-3">Loading…</td></tr>';
+        const res = await fetch(`../api/network-admin.php?${params}`);
+        const data = await res.json();
+        if (data.status !== 'success') { body.innerHTML = `<tr><td colspan="7" class="text-danger text-center py-3">${escapeHtml(data.message || 'Failed to load')}</td></tr>`; return; }
+        const rows = data.data.flags || [];
+        const canManage = netCanManage('network.finance.manage');
+        body.innerHTML = rows.length ? rows.map(f => `<tr>
+            <td>${escapeHtml(f.user_name)} <span class="text-muted small">${escapeHtml(f.public_user_id || '')}</span></td>
+            <td class="small text-capitalize">${escapeHtml((f.flag_type || '').replace(/_/g, ' '))}</td>
+            <td><span class="badge bg-${f.severity === 'high' ? 'danger' : (f.severity === 'medium' ? 'warning text-dark' : 'secondary')}">${escapeHtml(f.severity)}</span></td>
+            <td class="small">${escapeHtml(f.details || '—')}</td>
+            <td><span class="badge ${NET_FRAUD_BADGE[f.status] || 'bg-secondary'}">${escapeHtml(f.status)}</span>${f.resolution_notes ? `<div class="small text-muted">${escapeHtml(f.resolution_notes)}</div>` : ''}</td>
+            <td class="small text-muted">${f.created_at ? new Date(f.created_at).toLocaleDateString() : ''}</td>
+            <td>${canManage && ['open', 'reviewing'].includes(f.status) ? netFraudActionButtons(f.id) : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No fraud flags.</td></tr>';
+        renderPagination('net-fraud-pagination', data.pagination, loadNetworkFraud);
+    }
+    async function resolveNetworkFraudFlag(id, status) {
+        const notes = prompt('Resolution notes:') || '';
+        const res = await postJsonCsrf('../api/network-admin.php?action=resolve_fraud_flag', { flag_id: id, status, notes });
+        if (res.status === 'success') loadNetworkFraud(1); else alert(res.message || 'Failed');
+    }
+
+    // ---- CSV export (spec 13: "downloadable reports") — generic,
+    // reused across every Network list rather than one-off per table.
+    function downloadCsv(filename, headers, rows) {
+        // CSV/formula-injection guard (OWASP): a cell whose value starts
+        // with =, +, -, @ (or a tab/CR) is interpreted as a formula by
+        // Excel/Sheets when the file is opened — a malicious bank name,
+        // account name, or partner fullname could otherwise execute code
+        // or exfiltrate data on whoever opens the export. Prefixing with
+        // a single quote forces text interpretation without changing the
+        // visible value for any legitimate (non-formula-looking) input.
+        const neutralizeFormula = (v) => /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+        const esc = (v) => '"' + neutralizeFormula(String(v ?? '')).replace(/"/g, '""') + '"';
+        const csv = [headers.map(esc).join(',')].concat(rows.map(r => r.map(esc).join(','))).join('\r\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+    async function exportNetworkPartnersCsv() {
+        const params = new URLSearchParams({ action: 'partners', page: 1, limit: 1000 });
+        const q = document.getElementById('net-p-q').value.trim(); if (q) params.set('q', q);
+        const status = document.getElementById('net-p-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-partners.csv', ['Name', 'Public ID', 'Type', 'Code', 'Status', 'Total Referrals', 'Lifetime Rewards', 'Joined'],
+            (data.data.partners || []).map(p => [p.fullname, p.public_user_id, p.user_type, p.referral_code, p.status, p.total_referrals, p.lifetime_rewards, p.joined_at]));
+    }
+    async function exportNetworkReferralsCsv() {
+        const params = new URLSearchParams({ action: 'referrals', page: 1, limit: 1000 });
+        const q = document.getElementById('net-r-q').value.trim(); if (q) params.set('q', q);
+        const category = document.getElementById('net-r-category').value; if (category) params.set('category', category);
+        const status = document.getElementById('net-r-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-referrals.csv', ['Referrer', 'Referred', 'Category', 'Status', 'Registered', 'Earning Starts', 'Earning Expires', 'Qualifying Rides', 'Commission Generated', 'Rewards Generated'],
+            (data.data.referrals || []).map(r => [r.referrer_name, r.referred_name, r.referred_category, r.status, r.registered_at, r.earning_starts_at, r.earning_expires_at, r.qualifying_ride_count, r.total_commission_generated, r.total_rewards_generated]));
+    }
+    async function exportNetworkRewardsCsv() {
+        const params = new URLSearchParams({ action: 'reward_ledger', page: 1, limit: 1000 });
+        const status = document.getElementById('net-rw-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-rewards.csv', ['Beneficiary', 'Role', 'Commission Base', 'Pct', 'Reward Amount', 'Status', 'Created'],
+            (data.data.ledger || []).map(r => [r.beneficiary_name, r.beneficiary_role, r.commission_base, r.reward_pct, r.reward_amount, r.status, r.created_at]));
+    }
+    async function exportNetworkWithdrawalsCsv() {
+        const params = new URLSearchParams({ action: 'withdrawals', page: 1, limit: 1000 });
+        const status = document.getElementById('net-w-status').value; if (status) params.set('status', status);
+        const res = await fetch(`../api/network-admin.php?${params}`); const data = await res.json();
+        if (data.status !== 'success') { alert(data.message || 'Export failed'); return; }
+        downloadCsv('mohtoh-network-withdrawals.csv', ['Partner', 'Amount', 'Bank', 'Account Last4', 'Status', 'Requested', 'Reference'],
+            (data.data.withdrawals || []).map(w => [w.user_name, w.amount, w.bank_name, w.account_number_last4, w.status, w.requested_at, w.payment_reference]));
+    }
+
     // Load the Google Maps JS API once, using the browser key served by the
     // session-guarded api/maps-key.php (which reads it from the Integration
     // Center). No key is hardcoded here. Resolves to google.maps, or rejects
@@ -1419,9 +2152,12 @@ if ($_SESSION['user_type'] !== 'admin') {
     function renderMap(users){ if (!map || !(window.google && google.maps)) return; const g=google.maps; adminMarkers.forEach(m=>{ if('map' in m) m.map=null; else if(m.setMap) m.setMap(null); }); adminMarkers=[]; const bounds=new g.LatLngBounds(); let count=0; const info=new g.InfoWindow(); users.forEach(user=>{ if(user.latitude && user.longitude){ const pos={lat:parseFloat(user.latitude),lng:parseFloat(user.longitude)}; const color=user.user_type==='driver'?'#f59e0b':'#2563eb'; let marker; if(g.marker && typeof g.marker.AdvancedMarkerElement==='function'){ const dot=document.createElement('div'); dot.style.cssText=`background:${color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,.15);`; marker=new g.marker.AdvancedMarkerElement({map,position:pos,content:dot,title:user.fullname||'User'}); } else { marker=new g.Marker({map,position:pos,title:user.fullname||'User'}); } const html=`<b>${escapeHtml(user.fullname||'User')}</b><br>${escapeHtml(user.user_type||'')}`; g.event.addListener(marker,'click',()=>{ info.setContent(html); info.open(map,marker); }); adminMarkers.push(marker); bounds.extend(pos); count++; } }); if(count>1) map.fitBounds(bounds,48); else if(count===1){ map.setCenter(bounds.getCenter()); map.setZoom(13); } }
     function getUploadUrl(path){ if(!path) return ''; if(/^(https?:)?\/\//.test(path) || path.startsWith('/') || path.startsWith('./') || path.startsWith('../')) return path; return `../uploads/${path}`; }
     async function openUserModal(userType, userId, isSuspended, isVerified){ const modalEl=document.getElementById('detailModal'); const titleEl=document.getElementById('detailModalLabel'); const bodyEl=document.getElementById('detailModalBody'); const footerEl=document.getElementById('detailModalFooter'); if(!modalEl||!bodyEl||!footerEl||!titleEl) return; titleEl.textContent = userType === 'driver' ? 'Driver Details' : 'Passenger Details'; bodyEl.innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>'; footerEl.innerHTML=''; const res=await fetch(`../api/admin-api.php?action=user_profile_reviews&user_id=${userId}`); const data=await res.json(); if(data.status !== 'success'){ bodyEl.innerHTML=`<div class="alert alert-danger">${escapeHtml(data.message||'Unable to load details.')}</div>`; new bootstrap.Modal(modalEl).show(); return; } const profile=data.data.profile||{}; const stats=data.data.stats||{}; const wallet=data.data.wallet_summary; const actionButtons=[]; if(userType === 'driver' && !isVerified){ actionButtons.push(`<button class="btn btn-sm btn-outline-primary me-2" onclick="approveDriver(${userId}); openUserModal('${userType}', ${userId}, ${isSuspended}, 1);">Approve</button>`); } actionButtons.push(`<button class="btn btn-sm btn-outline-${isSuspended ? 'success' : 'danger'}" onclick="toggleUserAccess(${userId}, '${isSuspended ? 'unsuspend_user' : 'suspend_user'}'); openUserModal('${userType}', ${userId}, ${isSuspended ? 0 : 1}, ${isVerified});">${isSuspended ? 'Unsuspend' : 'Suspend'}</button>`); const walletBlock = wallet ? `<div class="col-12"><div class="border rounded p-3"><div class="text-muted small mb-2">Wallet — Commission Reservations</div><div class="row g-2 text-center mb-2"><div class="col-3"><div class="small text-muted">Total</div><div class="fw-bold">₦${Number(wallet.total_balance).toLocaleString()}</div></div><div class="col-3"><div class="small text-muted">Available</div><div class="fw-bold text-success">₦${Number(wallet.available_balance).toLocaleString()}</div></div><div class="col-3"><div class="small text-muted">Reserved</div><div class="fw-bold text-warning">₦${Number(wallet.reserved_balance).toLocaleString()}</div></div><div class="col-3"><div class="small text-muted">Commission Collected</div><div class="fw-bold">₦${Number(wallet.commission_collected).toLocaleString()}</div></div></div><div class="small text-muted mb-1">Commission Pending: ₦${Number(wallet.commission_pending).toLocaleString()}</div>${(wallet.active_reservations||[]).length ? `<table class="table table-sm mb-0 mt-2"><thead><tr><th>Ride</th><th>Reserved</th><th>Used</th><th>Outstanding</th></tr></thead><tbody>${wallet.active_reservations.map(r=>`<tr><td>#${r.ride_share_id}</td><td>₦${Number(r.reserved_amount).toLocaleString()}</td><td>₦${Number(r.used_amount).toLocaleString()}</td><td>₦${Number(r.reserved_amount - r.used_amount - r.released_amount).toLocaleString()}</td></tr>`).join('')}</tbody></table>` : '<div class="small text-muted">No active reservations.</div>'}</div></div>` : '';
-bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border rounded p-3"><h6 class="fw-bold mb-2">${escapeHtml(profile.fullname||'User')}</h6><div class="small text-muted">${escapeHtml(profile.user_type||userType)} • ${escapeHtml(profile.user_id||'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Email</div><div class="fw-semibold">${escapeHtml(profile.email||'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Phone</div><div class="fw-semibold">${escapeHtml(profile.phone||'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Rating</div><div class="fw-semibold">${parseFloat(profile.rating||0).toFixed(2)}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Completed rides</div><div class="fw-semibold">${profile.completed_rides || 0}</div></div></div>${walletBlock}<div class="col-12"><div class="border rounded p-3"><div class="text-muted small">Review summary</div><div class="fw-semibold">${stats.total_reviews || 0} review(s) • ${parseFloat(stats.average_rating || 0).toFixed(2)} avg</div></div></div></div>`; footerEl.innerHTML=actionButtons.join(''); new bootstrap.Modal(modalEl).show(); }
-    async function openVehicleModal(vehicleId, currentStatus){ const modalEl=document.getElementById('detailModal'); const titleEl=document.getElementById('detailModalLabel'); const bodyEl=document.getElementById('detailModalBody'); const footerEl=document.getElementById('detailModalFooter'); if(!modalEl||!bodyEl||!footerEl||!titleEl) return; titleEl.textContent='Vehicle Details'; bodyEl.innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>'; footerEl.innerHTML=''; const res=await fetch(`../api/admin-api.php?action=vehicle_details&vehicle_id=${vehicleId}`); const data=await res.json(); if(data.status !== 'success'){ bodyEl.innerHTML=`<div class="alert alert-danger">${escapeHtml(data.message||'Unable to load vehicle details.')}</div>`; new bootstrap.Modal(modalEl).show(); return; } const vehicle=data.data.vehicle||{}; const photos=Array.isArray(data.data.photos)?data.data.photos:[]; const documents=Array.isArray(data.data.documents)?data.data.documents:[]; const actionButtons=[]; if(currentStatus !== 'approved'){ actionButtons.push(`<button class="btn btn-sm btn-outline-success me-2" onclick="approveVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'approved');">Approve</button>`); actionButtons.push(`<button class="btn btn-sm btn-outline-danger" onclick="rejectVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'rejected');">Reject</button>`); } else { actionButtons.push(`<button class="btn btn-sm btn-outline-dark" onclick="suspendVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'rejected');">Suspend</button>`); } const photoMarkup = photos.length ? `<div class="mt-3"><div class="small text-muted mb-2">Vehicle images</div><div class="row g-2">${photos.map(photo=>{ const photoPath = escapeHtml(photo.photo_path || ''); return `<div class="col-6 col-md-4"><div class="border rounded p-2"><img src="../uploads/${photoPath}" alt="Vehicle image" class="img-fluid rounded" style="max-height:120px;width:100%;object-fit:cover;cursor:pointer;" onclick="openImagePreview('../uploads/${photoPath}', ${JSON.stringify('Vehicle image')})"><div class="small text-muted mt-2">${escapeHtml(photo.created_at || 'Image')}</div></div></div>`; }).join('')}</div></div>` : ''; const documentMarkup = documents.length ? `<div class="mt-3"><div class="small text-muted mb-2">Documents / licence</div><div class="row g-2">${documents.map(doc=>{ const docPath = escapeHtml(doc.document_path || ''); const docUrl = `../uploads/${docPath}`; const isImage=/\.(png|jpe?g|gif|webp|bmp)$/i.test(doc.document_path || ''); return `<div class="col-6 col-md-4"><div class="border rounded p-2">${isImage?`<img src="${docUrl}" alt="Document" class="img-fluid rounded" style="max-height:120px;width:100%;object-fit:cover;cursor:pointer;" onclick="openImagePreview('${docUrl}', ${JSON.stringify(doc.document_name || 'Document')})">`:`<a href="${docUrl}" target="_blank" class="btn btn-outline-secondary btn-sm w-100">Open file</a>`}<div class="small fw-semibold mt-2">${escapeHtml(doc.document_type_label || doc.document_name || 'Document')}</div><div class="small text-muted">${escapeHtml(doc.document_name || '')} <span class="badge ${doc.status==='approved'?'bg-success':doc.status==='rejected'?'bg-danger':'bg-warning text-dark'}">${escapeHtml(doc.status || 'pending')}</span></div>${doc.status==='rejected' && doc.rejection_reason ? `<div class="small text-danger">${escapeHtml(doc.rejection_reason)}</div>` : ''}</div></div>`; }).join('')}</div></div>` : ''; bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border rounded p-3"><h6 class="fw-bold mb-2">${escapeHtml(vehicle.vehicle_name || vehicle.make || 'Vehicle')}</h6><div class="small text-muted">${escapeHtml(vehicle.driver_name || 'Unknown driver')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Vehicle Type</div><div class="fw-semibold">${escapeHtml(data.data.vehicle_type_label || vehicle.vehicle_type || 'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Plate</div><div class="fw-semibold">${escapeHtml(vehicle.plate_number || 'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Status</div><div class="fw-semibold">${escapeHtml(vehicle.status || 'pending')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Photos</div><div class="fw-semibold">${vehicle.photo_count || 0}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Documents</div><div class="fw-semibold">${vehicle.document_count || 0}</div></div></div><div class="col-12"><div class="border rounded p-3"><div class="text-muted small">Remarks</div><div class="fw-semibold">${escapeHtml(vehicle.review_remarks || 'No remarks yet')}</div></div></div>${photoMarkup ? `<div class="col-12">${photoMarkup}</div>` : ''}${documentMarkup ? `<div class="col-12">${documentMarkup}</div>` : ''}</div>`; footerEl.innerHTML=actionButtons.join(''); new bootstrap.Modal(modalEl).show(); }
-    function openImagePreview(url, title){ const modalEl=document.getElementById('imagePreviewModal'); const titleEl=document.getElementById('imagePreviewModalLabel'); const bodyEl=document.getElementById('imagePreviewBody'); if(!modalEl||!titleEl||!bodyEl||!url) return; titleEl.textContent=title||'Preview'; bodyEl.innerHTML=`<img src="${escapeHtml(url)}" alt="Preview" class="img-fluid" style="max-height:70vh;object-fit:contain;">`; new bootstrap.Modal(modalEl).show(); }
+const rawAvatar = profile.profile_image || ''; const hasAvatar = rawAvatar && rawAvatar !== 'default.png'; const avatarFallback = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile.fullname || 'User').replace(/'/g, '%27') + '&background=0F8B8D&color=fff'; const avatarThumb = hasAvatar ? ('../img.php?f=' + encodeURIComponent(rawAvatar) + '&w=160') : avatarFallback; window.__profilePreview = hasAvatar ? { url: '../uploads/' + rawAvatar, title: (profile.fullname || 'User') + ' — profile picture' } : null; const avatarImg = `<img src="${avatarThumb}" alt="Profile picture" class="rounded-circle border flex-shrink-0" style="width:64px;height:64px;object-fit:cover;${hasAvatar ? 'cursor:pointer;' : ''}" ${hasAvatar ? 'onclick="openProfilePreview()"' : ''} onerror="this.onerror=null;this.src='${avatarFallback}'">`; bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border rounded p-3 d-flex align-items-center gap-3">${avatarImg}<div><h6 class="fw-bold mb-1">${escapeHtml(profile.fullname||'User')}</h6><div class="small text-muted">${escapeHtml(profile.user_type||userType)} • ${escapeHtml(profile.user_id||'N/A')}</div></div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Email</div><div class="fw-semibold">${escapeHtml(profile.email||'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Phone</div><div class="fw-semibold">${escapeHtml(profile.phone||'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Rating</div><div class="fw-semibold">${parseFloat(profile.rating||0).toFixed(2)}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Completed rides</div><div class="fw-semibold">${profile.completed_rides || 0}</div></div></div>${walletBlock}<div class="col-12"><div class="border rounded p-3"><div class="text-muted small">Review summary</div><div class="fw-semibold">${stats.total_reviews || 0} review(s) • ${parseFloat(stats.average_rating || 0).toFixed(2)} avg</div></div></div></div>`; footerEl.innerHTML=actionButtons.join(''); new bootstrap.Modal(modalEl).show(); }
+    async function openVehicleModal(vehicleId, currentStatus){ const modalEl=document.getElementById('detailModal'); const titleEl=document.getElementById('detailModalLabel'); const bodyEl=document.getElementById('detailModalBody'); const footerEl=document.getElementById('detailModalFooter'); if(!modalEl||!bodyEl||!footerEl||!titleEl) return; titleEl.textContent='Vehicle Details'; bodyEl.innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>'; footerEl.innerHTML=''; const res=await fetch(`../api/admin-api.php?action=vehicle_details&vehicle_id=${vehicleId}`); const data=await res.json(); if(data.status !== 'success'){ bodyEl.innerHTML=`<div class="alert alert-danger">${escapeHtml(data.message||'Unable to load vehicle details.')}</div>`; new bootstrap.Modal(modalEl).show(); return; } const vehicle=data.data.vehicle||{}; const photos=Array.isArray(data.data.photos)?data.data.photos:[]; const documents=Array.isArray(data.data.documents)?data.data.documents:[]; const actionButtons=[]; if(currentStatus !== 'approved'){ actionButtons.push(`<button class="btn btn-sm btn-outline-success me-2" onclick="approveVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'approved');">Approve</button>`); actionButtons.push(`<button class="btn btn-sm btn-outline-danger" onclick="rejectVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'rejected');">Reject</button>`); } else { actionButtons.push(`<button class="btn btn-sm btn-outline-dark" onclick="suspendVehicle(${vehicleId}); openVehicleModal(${vehicleId}, 'rejected');">Suspend</button>`); } const photoGallery = photos.map((photo, idx)=>({ url: '../uploads/' + (photo.photo_path || ''), title: 'Vehicle image ' + (idx+1) + ' of ' + photos.length })); const photoMarkup = photos.length ? `<div class="mt-3"><div class="small text-muted mb-2">Vehicle images</div><div class="row g-2">${photos.map((photo, idx)=>{ const rawPath = photo.photo_path || ''; const thumbUrl = '../img.php?f=' + encodeURIComponent(rawPath) + '&w=400'; return `<div class="col-6 col-md-4"><div class="border rounded p-2"><img src="${thumbUrl}" loading="lazy" alt="Vehicle image" class="img-fluid rounded" style="max-height:120px;width:100%;object-fit:cover;cursor:pointer;" onclick="openVehiclePhotoGallery(${idx})"><div class="small text-muted mt-2">${escapeHtml(photo.created_at || 'Image')}</div></div></div>`; }).join('')}</div></div>` : ''; window.__vehiclePhotoGallery = photoGallery; const docGallery = []; const documentMarkup = documents.length ? `<div class="mt-3"><div class="small text-muted mb-2">Documents / licence</div><div class="row g-2">${documents.map(doc=>{ const rawDocPath = doc.document_path || ''; const docPath = escapeHtml(rawDocPath); const docUrl = `../uploads/${docPath}`; const thumbUrl = '../img.php?f=' + encodeURIComponent(rawDocPath) + '&w=400'; const isImage=/\.(png|jpe?g|gif|webp|bmp)$/i.test(rawDocPath); let media; if(isImage){ const gi = docGallery.length; docGallery.push({ url: '../uploads/' + rawDocPath, title: (doc.document_name || 'Document') }); media = `<img src="${thumbUrl}" loading="lazy" alt="Document" class="img-fluid rounded" style="max-height:120px;width:100%;object-fit:cover;cursor:pointer;" onclick="openVehicleDocGallery(${gi})">`; } else { media = `<a href="${docUrl}" target="_blank" class="btn btn-outline-secondary btn-sm w-100">Open file</a>`; } return `<div class="col-6 col-md-4"><div class="border rounded p-2">${media}<div class="small fw-semibold mt-2">${escapeHtml(doc.document_type_label || doc.document_name || 'Document')}</div><div class="small text-muted">${escapeHtml(doc.document_name || '')} <span class="badge ${doc.status==='approved'?'bg-success':doc.status==='rejected'?'bg-danger':'bg-warning text-dark'}">${escapeHtml(doc.status || 'pending')}</span></div>${doc.status==='rejected' && doc.rejection_reason ? `<div class="small text-danger">${escapeHtml(doc.rejection_reason)}</div>` : ''}</div></div>`; }).join('')}</div></div>` : ''; window.__vehicleDocGallery = docGallery; bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border rounded p-3"><h6 class="fw-bold mb-2">${escapeHtml(vehicle.vehicle_name || vehicle.make || 'Vehicle')}</h6><div class="small text-muted">${escapeHtml(vehicle.driver_name || 'Unknown driver')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Vehicle Type</div><div class="fw-semibold">${escapeHtml(data.data.vehicle_type_label || vehicle.vehicle_type || 'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Plate</div><div class="fw-semibold">${escapeHtml(vehicle.plate_number || 'N/A')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Status</div><div class="fw-semibold">${escapeHtml(vehicle.status || 'pending')}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Photos</div><div class="fw-semibold">${vehicle.photo_count || 0}</div></div></div><div class="col-md-6"><div class="border rounded p-3"><div class="text-muted small">Documents</div><div class="fw-semibold">${vehicle.document_count || 0}</div></div></div><div class="col-12"><div class="border rounded p-3"><div class="text-muted small">Remarks</div><div class="fw-semibold">${escapeHtml(vehicle.review_remarks || 'No remarks yet')}</div></div></div>${photoMarkup ? `<div class="col-12">${photoMarkup}</div>` : ''}${documentMarkup ? `<div class="col-12">${documentMarkup}</div>` : ''}</div>`; footerEl.innerHTML=actionButtons.join(''); new bootstrap.Modal(modalEl).show(); }
+    function openVehiclePhotoGallery(startIndex){ const items=Array.isArray(window.__vehiclePhotoGallery)?window.__vehiclePhotoGallery:[]; if(!items.length) return; if(window.MeritImageViewer && window.MeritImageViewer.openGallery){ window.MeritImageViewer.openGallery(items, startIndex||0); return; } const item=items[startIndex||0]||items[0]; openImagePreview(item.url, item.title); }
+    function openVehicleDocGallery(startIndex){ const items=Array.isArray(window.__vehicleDocGallery)?window.__vehicleDocGallery:[]; if(!items.length) return; if(window.MeritImageViewer && window.MeritImageViewer.openGallery){ window.MeritImageViewer.openGallery(items, startIndex||0); return; } const item=items[startIndex||0]||items[0]; openImagePreview(item.url, item.title); }
+    function openProfilePreview(){ const p=window.__profilePreview; if(p && p.url) openImagePreview(p.url, p.title); }
+    function openImagePreview(url, title){ if(!url) return; if(window.MeritImageViewer && window.MeritImageViewer.open){ window.MeritImageViewer.open(url, title||'Preview'); return; } const modalEl=document.getElementById('imagePreviewModal'); const titleEl=document.getElementById('imagePreviewModalLabel'); const bodyEl=document.getElementById('imagePreviewBody'); if(!modalEl||!titleEl||!bodyEl) return; titleEl.textContent=title||'Preview'; bodyEl.innerHTML=`<img src="${escapeHtml(url)}" alt="Preview" class="img-fluid" style="max-height:70vh;object-fit:contain;">`; new bootstrap.Modal(modalEl).show(); }
     async function approveDriver(userId){ const res=await sendAction({action:'approve_driver',user_id:userId}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to approve driver'); }
     async function approveVehicle(vehicleId){ const res=await sendAction({action:'approve_vehicle',vehicle_id:vehicleId,remarks:'Approved from admin console'}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to approve vehicle'); }
     async function suspendVehicle(vehicleId){ const reason=prompt('Enter the reason for suspending this vehicle:'); if(reason===null) return; if(!reason.trim()){ alert('A suspension reason is required.'); return; } const res=await sendAction({action:'suspend_vehicle',vehicle_id:vehicleId,remarks:reason.trim()}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to suspend vehicle'); }
@@ -1438,6 +2174,19 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
     async function sendAction(payload){ const res=await fetch('../api/admin-api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
     // ---- Shared helper: POST JSON to any endpoint (sendAction above is admin-api.php-specific) ----
     async function postJson(url, payload){ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
+    // ---- CSRF-protected POST, for api/network-admin.php only ----
+    // Same contract as postJson(), but every call carries the session's
+    // CSRF token (read from the <meta name="csrf-token"> tag this page
+    // renders via csrf_token()) as a `csrf_token` body field — same
+    // convention assets/js/profile.js already uses against
+    // api/social-accounts.php, so require_csrf() needs no new code path.
+    // Scoped to MOHTOH NETWORK's admin actions only — the generic
+    // postJson() above is left untouched so no other admin tab's
+    // request contract changes.
+    function csrfToken() { return document.querySelector('meta[name="csrf-token"]')?.content || ''; }
+    async function postJsonCsrf(url, payload) {
+        return postJson(url, { ...payload, csrf_token: csrfToken() });
+    }
     function showTabAlert(elId, res){ const el=document.getElementById(elId); if(!el) return; el.className='alert '+(res.status==='success'?'alert-success':'alert-danger'); el.textContent=res.message||(res.status==='success'?'Saved':'Failed'); el.classList.remove('d-none'); }
 
     // ---- Part 3: Universal Pagination — reusable renderer for every
@@ -1627,6 +2376,7 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
         PAYMENT_TOGGLE_KEYS.forEach(key => { const el=document.getElementById('pay-'+key); if(el) el.checked = !!payment[key]; });
         const payStatusBadge = document.getElementById('pay-provider-status');
         if (payStatusBadge) { const provName = (payment.provider || 'paystack'); payStatusBadge.textContent = `${provName.charAt(0).toUpperCase()+provName.slice(1)} · ${payment.enabled ? 'Enabled' : 'Disabled'} · ${payment.mode === 'test' ? 'TEST' : 'LIVE'}`; payStatusBadge.className = 'badge align-middle ms-1 ' + (payment.enabled ? 'bg-success' : 'bg-secondary'); }
+        OAUTH_CARDS.forEach(cfg => fillOAuthCard(cfg, data.data[cfg.dataKey]));
         toggleEmailProviderFields();
         toggleSmsProviderFields();
     }
@@ -1667,6 +2417,50 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
         const res = await postJson('../api/integration-center.php', { action: 'test_payment' });
         btn.disabled = false; btn.textContent = 'Test Connection';
         showTabAlert('pay-test-alert', res);
+    }
+    // Social Login (Google / Facebook OAuth). Each provider card shares one shape:
+    // an enable switch (controls frontend button AND backend flow), a public
+    // client/app id, an encrypted secret (blank = keep the saved value), and the
+    // fixed redirect URI to register with the provider. The secret is only ever
+    // shown as a mask and is cleared from the input after a successful save.
+    const OAUTH_CARDS = [
+        { prefix: 'goog', dataKey: 'google_oauth',   form: 'google-oauth-form',   save: 'save_google_oauth',   test: 'test_google_oauth',   label: 'Google',   badge: 'google-oauth-status' },
+        { prefix: 'fb',   dataKey: 'facebook_oauth', form: 'facebook-oauth-form', save: 'save_facebook_oauth', test: 'test_facebook_oauth', label: 'Facebook', badge: 'facebook-oauth-status' },
+    ];
+    function fillOAuthCard(cfg, d){
+        if (!d) return;
+        const en = document.getElementById(cfg.prefix + '-enabled'); if (en) en.checked = !!d.enabled;
+        const cid = document.getElementById(cfg.prefix + '-client_id'); if (cid) cid.value = d.client_id ?? '';
+        const secStatus = document.getElementById(cfg.prefix + '-client_secret-status'); const sec = d.client_secret || {};
+        if (secStatus) secStatus.textContent = sec.configured ? (sec.needsReentry ? '(saved secret unreadable — re-enter)' : `(saved: ${sec.masked})`) : '(not set)';
+        const ruri = document.getElementById(cfg.prefix + '-redirect_uri'); if (ruri) ruri.value = d.redirect_uri ?? '';
+        const rdef = document.getElementById(cfg.prefix + '-redirect_uri-default'); if (rdef) rdef.textContent = d.default_redirect_uri ?? '';
+        const badge = document.getElementById(cfg.badge);
+        if (badge) {
+            let txt, cls;
+            if (d.usable) { txt = cfg.label + ' · Enabled'; cls = 'bg-success'; }
+            else if (d.enabled && !d.configured) { txt = cfg.label + ' · Enabled · needs credentials'; cls = 'bg-warning text-dark'; }
+            else { txt = cfg.label + ' · Disabled'; cls = 'bg-secondary'; }
+            badge.textContent = txt; badge.className = 'badge align-middle ms-1 ' + cls;
+        }
+    }
+    async function handleOAuthSubmit(cfg, event){
+        event.preventDefault();
+        const settings = {
+            enabled: document.getElementById(cfg.prefix + '-enabled').checked,
+            client_id: document.getElementById(cfg.prefix + '-client_id').value,
+            client_secret: document.getElementById(cfg.prefix + '-client_secret').value, // blank = leave unchanged, enforced server-side
+            redirect_uri: document.getElementById(cfg.prefix + '-redirect_uri').value,
+        };
+        const res = await postJson('../api/integration-center.php', { action: cfg.save, settings });
+        showTabAlert(cfg.form.replace('-form', '-alert'), res);
+        if (res.status === 'success') { document.getElementById(cfg.prefix + '-client_secret').value = ''; loadIntegrationCenter(); }
+    }
+    async function testOAuth(cfg){
+        const btn = document.getElementById(cfg.prefix + '-test-btn'); const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Testing…';
+        const res = await postJson('../api/integration-center.php', { action: cfg.test });
+        btn.disabled = false; btn.textContent = orig;
+        showTabAlert(cfg.prefix + '-test-alert', res);
     }
     async function handleEmailIntegrationSubmit(event){
         event.preventDefault();
@@ -2170,6 +2964,146 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
             if (res.status === 'success') loadPfRequests(pfRequestsPage); else alert(res.message);
         }
     });
+    // ==================================================================
+    // Administrators (Super-Admin-only) — create/manage Subadmins, change
+    // their permissions, suspend/reactivate, and view their audit activity.
+    // Every call hits api/admin-management.php, which re-verifies Super Admin
+    // on EVERY request; hiding this tab from non-supers is cosmetic only. The
+    // permission catalog is fetched from the server (single source of truth)
+    // and rendered as grouped checkboxes — money/config writes are never in
+    // that list, so this UI cannot grant a subadmin a money-moving action.
+    // Action buttons pass ONLY numeric ids inline; names are looked up from
+    // adminsById, so no user-controlled text ever enters an onclick string.
+    // ==================================================================
+    let adminCatalog = null;        // {Group: {perm.key: label}} — cached after first fetch
+    let adminsById = {};            // id -> row from the last list load
+    let _adminMgmtModalInst = null;
+    function adminMgmtModal(){ if(!_adminMgmtModalInst){ const el=document.getElementById('adminMgmtModal'); if(!el) return null; _adminMgmtModalInst=new bootstrap.Modal(el); } const b=document.getElementById('adminMgmtSaveBtn'); if(b){ b.style.display=''; b.disabled=false; } return _adminMgmtModalInst; }
+    function showAdminsAlert(kind, text){ const el=document.getElementById('admins-alert'); if(!el) return; el.className='alert alert-'+(kind==='success'?'success':'danger'); el.textContent=text||''; el.classList.remove('d-none'); setTimeout(()=>el.classList.add('d-none'), 4500); }
+    async function ensureAdminCatalog(){ if(adminCatalog) return; const res=await fetch('../api/admin-management.php?action=catalog'); const data=await res.json(); if(data.status==='success') adminCatalog=data.data.catalog||{}; }
+    function permissionCheckboxesHtml(selected){ const sel=new Set(selected||[]); return Object.entries(adminCatalog||{}).map(([group,perms])=>{ const items=Object.entries(perms).map(([key,label])=>`<div class="form-check"><input class="form-check-input adm-perm" type="checkbox" value="${escapeHtml(key)}" id="perm-${escapeHtml(key)}"${sel.has(key)?' checked':''}><label class="form-check-label" for="perm-${escapeHtml(key)}">${escapeHtml(label)} <span class="text-muted small">(${escapeHtml(key)})</span></label></div>`).join(''); return `<div class="mb-3"><div class="fw-semibold small text-uppercase text-muted mb-1">${escapeHtml(group)}</div>${items}</div>`; }).join(''); }
+    function collectSelectedPermissions(){ return Array.from(document.querySelectorAll('#adminMgmtModalBody .adm-perm:checked')).map(cb=>cb.value); }
+
+    async function loadAdminsTab(){ const body=document.getElementById('admins-body'); if(!body) return; body.innerHTML='<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></td></tr>'; const res=await fetch('../api/admin-management.php?action=list'); const data=await res.json(); if(data.status!=='success'){ body.innerHTML=`<tr><td colspan="6" class="text-danger text-center py-3">${escapeHtml(data.message||'Unable to load administrators.')}</td></tr>`; return; } renderAdminsTable(data.data.admins||[]); }
+    function renderAdminsTable(admins){ const body=document.getElementById('admins-body'); if(!body) return; adminsById={}; admins.forEach(a=>{ adminsById[a.id]=a; }); if(!admins.length){ body.innerHTML='<tr><td colspan="6" class="text-muted text-center py-3">No administrators found.</td></tr>'; return; } body.innerHTML=admins.map(a=>{ const isSuper=String(a.is_super_admin)==='1'||a.is_super_admin===true; const suspended=a.admin_status==='suspended'; const ut=a.user_type||''; const multiRole= ut==='driver' ? 'Driver' : (ut==='rider' ? 'Rider' : ''); let roleBadge=isSuper?'<span class="badge bg-primary">Super Admin</span>':'<span class="badge bg-secondary">Subadmin</span>'; if(!isSuper && multiRole){ roleBadge+=` <span class="badge bg-info text-dark">+ ${multiRole}</span>`; } const statusBadge=suspended?'<span class="badge bg-danger">Suspended</span>':'<span class="badge bg-success">Active</span>'; let actions=`<button class="btn btn-sm btn-outline-info me-1 mb-1" onclick="openAdminActivity(${a.id})">Activity</button>`; if(!isSuper){ actions+=`<button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="openEditSubadmin(${a.id})">Edit</button>`; actions+=`<button class="btn btn-sm btn-outline-primary me-1 mb-1" onclick="openChangePermissions(${a.id})">Permissions</button>`; if(multiRole){ actions+=`<button class="btn btn-sm btn-outline-warning me-1 mb-1" onclick="demoteAdmin(${a.id})">Remove Role</button>`; } actions+= suspended ? `<button class="btn btn-sm btn-outline-success mb-1" onclick="setAdminSuspension(${a.id},false)">Reactivate</button>` : `<button class="btn btn-sm btn-outline-danger mb-1" onclick="setAdminSuspension(${a.id},true)">Suspend</button>`; } else if(!a.is_self){ actions+= suspended ? `<button class="btn btn-sm btn-outline-success mb-1" onclick="setAdminSuspension(${a.id},false)">Reactivate</button>` : `<button class="btn btn-sm btn-outline-danger mb-1" onclick="setAdminSuspension(${a.id},true)">Suspend</button>`; } const perms=isSuper?'All access':((a.permission_count||0)+' granted'); return `<tr><td>${escapeHtml(a.fullname||'')}${a.is_self?' <span class="badge bg-light text-dark border">You</span>':''}</td><td class="small text-muted">${escapeHtml(a.email||'')}<br>${escapeHtml(a.phone||'')}</td><td>${roleBadge}</td><td>${statusBadge}</td><td class="small">${perms}</td><td class="text-nowrap">${actions}</td></tr>`; }).join(''); }
+
+    async function adminMgmtSubmit(payload, successMsg){ const msg=document.getElementById('adminMgmtModalMsg'); const btn=document.getElementById('adminMgmtSaveBtn'); if(btn) btn.disabled=true; if(msg){ msg.className='me-auto small text-muted'; msg.textContent='Saving…'; } const res=await postJson('../api/admin-management.php', payload); if(btn) btn.disabled=false; if(res.status==='success'){ const m=adminMgmtModal(); if(m) m.hide(); showAdminsAlert('success', res.message||successMsg); loadAdminsTab(); } else if(msg){ msg.className='me-auto small text-danger'; msg.textContent=res.message||'Action failed.'; } }
+
+    async function openCreateSubadmin(){ await ensureAdminCatalog(); document.getElementById('adminMgmtModalTitle').textContent='Create Subadmin'; const msg=document.getElementById('adminMgmtModalMsg'); if(msg) msg.textContent=''; document.getElementById('adminMgmtModalBody').innerHTML=`<div class="row g-3 mb-3"><div class="col-md-6"><label class="form-label">Full name</label><input type="text" class="form-control" id="adm-fullname"></div><div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="adm-email"></div><div class="col-md-6"><label class="form-label">Phone</label><input type="text" class="form-control" id="adm-phone"></div><div class="col-md-6"><label class="form-label">Password</label><input type="password" class="form-control" id="adm-password"></div></div><div class="fw-semibold mb-1">Permissions</div><p class="text-muted small mb-2">Grant only what this Subadmin needs. Money and configuration writes stay Super-Admin-only and never appear here.</p>${permissionCheckboxesHtml([])}`; const btn=document.getElementById('adminMgmtSaveBtn'); btn.textContent='Create Subadmin'; btn.onclick=()=>adminMgmtSubmit({ action:'create_subadmin', fullname:document.getElementById('adm-fullname').value.trim(), email:document.getElementById('adm-email').value.trim(), phone:document.getElementById('adm-phone').value.trim(), password:document.getElementById('adm-password').value, permissions:collectSelectedPermissions() }, 'Subadmin created.'); const m=adminMgmtModal(); if(m) m.show(); }
+
+    async function openEditSubadmin(userId){ const res=await fetch(`../api/admin-management.php?action=get_admin&user_id=${encodeURIComponent(userId)}`); const data=await res.json(); if(data.status!=='success'){ showAdminsAlert('error', data.message||'Could not load administrator.'); return; } const a=data.data.admin; document.getElementById('adminMgmtModalTitle').textContent='Edit Subadmin'; const msg=document.getElementById('adminMgmtModalMsg'); if(msg) msg.textContent=''; document.getElementById('adminMgmtModalBody').innerHTML=`<div class="row g-3"><div class="col-md-6"><label class="form-label">Full name</label><input type="text" class="form-control" id="adm-fullname" value="${escapeHtml(a.fullname||'')}"></div><div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="adm-email" value="${escapeHtml(a.email||'')}"></div><div class="col-md-6"><label class="form-label">Phone</label><input type="text" class="form-control" id="adm-phone" value="${escapeHtml(a.phone||'')}"></div><div class="col-md-6"><label class="form-label">New password <span class="text-muted small">(leave blank to keep)</span></label><input type="password" class="form-control" id="adm-password"></div></div>`; const btn=document.getElementById('adminMgmtSaveBtn'); btn.textContent='Save Changes'; btn.onclick=()=>adminMgmtSubmit({ action:'edit_subadmin', user_id:userId, fullname:document.getElementById('adm-fullname').value.trim(), email:document.getElementById('adm-email').value.trim(), phone:document.getElementById('adm-phone').value.trim(), password:document.getElementById('adm-password').value }, 'Subadmin updated.'); const m=adminMgmtModal(); if(m) m.show(); }
+
+    async function openChangePermissions(userId){ await ensureAdminCatalog(); const res=await fetch(`../api/admin-management.php?action=get_admin&user_id=${encodeURIComponent(userId)}`); const data=await res.json(); if(data.status!=='success'){ showAdminsAlert('error', data.message||'Could not load administrator.'); return; } document.getElementById('adminMgmtModalTitle').textContent='Change Permissions'; const msg=document.getElementById('adminMgmtModalMsg'); if(msg) msg.textContent=''; document.getElementById('adminMgmtModalBody').innerHTML=`<p class="text-muted small mb-2">Editing permissions for <strong>${escapeHtml(data.data.admin.fullname||'')}</strong>. Changes take effect on their next request — no re-login required.</p>${permissionCheckboxesHtml(data.data.permissions||[])}`; const btn=document.getElementById('adminMgmtSaveBtn'); btn.textContent='Save Permissions'; btn.onclick=()=>adminMgmtSubmit({ action:'set_permissions', user_id:userId, permissions:collectSelectedPermissions() }, 'Permissions updated.'); const m=adminMgmtModal(); if(m) m.show(); }
+
+    async function setAdminSuspension(userId, suspend){ if(!confirm(suspend?"Suspend this admin's access? Their rider/driver login (if any) is unaffected, and all records are preserved.":'Reactivate this admin?')) return; const res=await postJson('../api/admin-management.php', { action: suspend?'suspend_admin':'reactivate_admin', user_id:userId }); if(res.status==='success'){ showAdminsAlert('success', res.message||(suspend?'Admin suspended.':'Admin reactivated.')); loadAdminsTab(); } else showAdminsAlert('error', res.message||'Action failed.'); }
+
+    // ---- Add Existing User → Subadmin (multi-role promotion) --------------
+    // Promotes an EXISTING rider/driver by searching for their real account
+    // and calling promote_admin — it NEVER inserts a user, so an existing
+    // driver's email is promoted instead of raising "Email already registered".
+    // The shared footer Save button is hidden until a promotable account is
+    // found (adminMgmtModal() re-shows/enables it for every other modal).
+    let _promoteFound = null; // last search result that is eligible to promote
+    async function openPromoteExisting(){
+        await ensureAdminCatalog();
+        _promoteFound = null;
+        document.getElementById('adminMgmtModalTitle').textContent='Add Existing User as Subadmin';
+        const msg=document.getElementById('adminMgmtModalMsg'); if(msg) msg.textContent='';
+        document.getElementById('adminMgmtModalBody').innerHTML=
+            `<p class="text-muted small mb-2">Search for an existing Rider or Driver by email, phone, or user ID. Their account is promoted in place — no new account is created and their existing role stays unchanged.</p>`+
+            `<div class="input-group mb-3"><input type="text" class="form-control" id="promote-search-input" placeholder="Email, phone number, or user ID" autocomplete="off">`+
+            `<button class="btn btn-outline-primary" type="button" onclick="searchExistingUser()"><i class="fas fa-search me-1"></i>Search</button></div>`+
+            `<div id="promote-result"></div>`;
+        const m=adminMgmtModal();
+        const btn=document.getElementById('adminMgmtSaveBtn'); if(btn){ btn.style.display='none'; btn.textContent='Promote to Subadmin'; }
+        const inp=document.getElementById('promote-search-input');
+        if(inp) inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); searchExistingUser(); } });
+        if(m) m.show();
+        if(inp) setTimeout(()=>inp.focus(), 350);
+    }
+
+    async function searchExistingUser(){
+        const inp=document.getElementById('promote-search-input'); const out=document.getElementById('promote-result'); const btn=document.getElementById('adminMgmtSaveBtn');
+        if(!inp||!out) return;
+        const q=inp.value.trim();
+        if(!q){ out.innerHTML='<div class="alert alert-warning mb-0">Enter an email, phone number, or user ID.</div>'; return; }
+        _promoteFound=null; if(btn) btn.style.display='none';
+        out.innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>';
+        const res=await fetch(`../api/admin-management.php?action=search_user&q=${encodeURIComponent(q)}`);
+        const data=await res.json();
+        if(data.status!=='success'){ out.innerHTML=`<div class="alert alert-danger mb-0">${escapeHtml(data.message||'No account found.')}</div>`; return; }
+        renderPromoteResult(data.data);
+    }
+
+    // Renders the found account (no secrets — the server sends only profile +
+    // driver/vehicle/verification context) and decides the available action:
+    // already an admin → manage permissions; a rider/driver → promote; else a
+    // blocking notice.
+    function renderPromoteResult(d){
+        const out=document.getElementById('promote-result'); const btn=document.getElementById('adminMgmtSaveBtn'); if(!out) return;
+        const u=d.user||{}; const v=d.vehicle||null;
+        const yes='<span class="badge bg-success">Yes</span>', no='<span class="badge bg-secondary">No</span>';
+        const rows=[];
+        rows.push(['Name', escapeHtml(u.fullname||'—')]);
+        rows.push(['Email', escapeHtml(u.email||'—')+' '+(u.email_verified?yes:no)]);
+        rows.push(['Phone', escapeHtml(u.phone||'—')+' '+(u.phone_verified?yes:no)]);
+        rows.push(['User ID', escapeHtml(u.public_id||('#'+u.id))]);
+        rows.push(['Account type', escapeHtml((u.user_type||'').charAt(0).toUpperCase()+(u.user_type||'').slice(1))]);
+        rows.push(['Admin status', u.is_admin ? (u.is_super_admin?'<span class="badge bg-primary">Super Admin</span>':'<span class="badge bg-secondary">Subadmin</span>')+' ('+escapeHtml(u.admin_status||'active')+')' : '<span class="text-muted">Not an admin</span>']);
+        rows.push(['Account suspended', u.is_suspended?'<span class="badge bg-danger">Yes</span>':no]);
+        if(u.user_type==='driver'){
+            rows.push(['Driver verified', u.is_verified?yes:no]);
+            rows.push(['Driver tier', escapeHtml(u.driver_tier||'standard')]);
+            if(v){
+                rows.push(['Vehicle', escapeHtml(((v.make||'')+' '+(v.model||'')+' '+(v.year||'')).trim()||'—')+(v.vehicle_type_label?' <span class="badge bg-light text-dark border">'+escapeHtml(v.vehicle_type_label)+'</span>':'')]);
+                rows.push(['Plate', escapeHtml(v.plate_number||'—')]);
+                rows.push(['Vehicle verification', escapeHtml(v.verification_status||'—')]);
+            } else {
+                rows.push(['Vehicle', '<span class="text-muted">No vehicle on file</span>']);
+            }
+        }
+        const table='<div class="card border-0 bg-light mb-3"><div class="card-body p-3"><table class="table table-sm mb-0"><tbody>'+
+            rows.map(r=>`<tr><th class="text-muted fw-normal small" style="width:42%">${r[0]}</th><td class="small">${r[1]}</td></tr>`).join('')+
+            '</tbody></table></div></div>';
+
+        if(d.already_admin){
+            out.innerHTML=table+
+                `<div class="alert alert-info mb-2">This user is already an administrator. You can manage their permissions instead.</div>`+
+                (u.is_super_admin?'':`<button class="btn btn-outline-primary btn-sm" type="button" onclick="openChangePermissions(${u.id})"><i class="fas fa-key me-1"></i>Manage Permissions</button>`);
+            if(btn) btn.style.display='none'; _promoteFound=null; return;
+        }
+        if(!d.eligible){
+            out.innerHTML=table+`<div class="alert alert-warning mb-0">Only Rider or Driver accounts can be promoted to Subadmin.</div>`;
+            if(btn) btn.style.display='none'; _promoteFound=null; return;
+        }
+        _promoteFound=u;
+        out.innerHTML=table+
+            (u.is_suspended?`<div class="alert alert-warning py-2">Note: this account is currently suspended as a ${escapeHtml(u.user_type)}. Promoting adds the admin hat but does not change that.</div>`:'')+
+            `<div class="fw-semibold mb-1">Permissions</div>`+
+            `<p class="text-muted small mb-2">Grant only what this Subadmin needs. They always keep the <code>dashboard.view</code> baseline. Money and configuration writes stay Super-Admin-only and never appear here.</p>`+
+            permissionCheckboxesHtml([]);
+        if(btn){ btn.style.display=''; btn.textContent='Promote to Subadmin'; btn.onclick=()=>adminMgmtSubmit({ action:'promote_admin', user_id:_promoteFound.id, permissions:collectSelectedPermissions() }, 'Account promoted to Subadmin.'); }
+    }
+
+    // Remove the admin capability from a promoted rider/driver. The server
+    // guards self/super/dedicated-admin targets and leaves everything that
+    // makes them a rider/driver untouched.
+    async function demoteAdmin(userId){
+        const who=adminsById[userId]||{};
+        if(!confirm(`Remove the admin role from ${who.fullname||'this user'}? Their ${who.user_type||'rider/driver'} account, vehicles, rides, wallet and history stay completely intact — only the admin capability is removed.`)) return;
+        const res=await postJson('../api/admin-management.php', { action:'demote_admin', user_id:userId });
+        if(res.status==='success'){ showAdminsAlert('success', res.message||'Admin role removed.'); loadAdminsTab(); }
+        else showAdminsAlert('error', res.message||'Action failed.');
+    }
+
+    async function openAdminActivity(userId){ const who=adminsById[userId]||{}; const titleEl=document.getElementById('detailModalLabel'); const bodyEl=document.getElementById('detailModalBody'); const footerEl=document.getElementById('detailModalFooter'); titleEl.textContent='Activity — '+(who.fullname||''); bodyEl.innerHTML='<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div></div>'; footerEl.innerHTML=''; new bootstrap.Modal(document.getElementById('detailModal')).show(); const res=await fetch(`../api/admin-management.php?action=get_activity&user_id=${encodeURIComponent(userId)}&page=1`); const data=await res.json(); if(data.status!=='success'){ bodyEl.innerHTML=`<div class="alert alert-danger mb-0">${escapeHtml(data.message||'Unable to load activity.')}</div>`; return; } const rows=data.data.activity||[]; bodyEl.innerHTML = rows.length ? `<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>When</th><th>Action</th><th>Target</th><th>Old → New</th><th>Reason</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="small text-muted text-nowrap">${escapeHtml(r.created_at||'')}</td><td class="small">${escapeHtml(r.action||'')}</td><td class="small">${escapeHtml(((r.entity_type||'')+' '+(r.entity_id||'')).trim())}</td><td class="small">${escapeHtml((r.old_status||'—')+' → '+(r.new_status||'—'))}</td><td class="small">${escapeHtml(r.reason||'')}</td></tr>`).join('')}</tbody></table></div>` : '<div class="text-muted text-center py-3">No recorded activity yet.</div>'; }
+
+    // Topbar multi-role switch — only rendered for an admin who ALSO holds a
+    // rider/driver hat. Posts to the same api/switch-mode.php the rider/driver
+    // app uses; that endpoint re-checks capability server-side, so this is not
+    // a trust boundary — it only rewrites the session's current mode.
+    async function adminSwitchMode(mode){ const res=await postJson('../api/switch-mode.php', { action:'switch', mode }); if(res.status==='success'){ window.location.href=(res.data&&res.data.redirect)?res.data.redirect:(mode==='driver'?'../driver/dashboard.php':'../rider/dashboard.php'); } else alert(res.message||'Could not switch mode.'); }
+
     async function logout(){ const formData=new FormData(); formData.append('action','logout'); const res=await fetch('../api/auth.php',{method:'POST',body:formData}); const data=await res.json(); if(data.status==='success') window.location.href=data.data.redirect||'../index.php'; }
     function escapeHtml(value){ return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
 </script>

@@ -10,9 +10,10 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || $_SESSION['user_type'] !== 'admin') {
-    json_response('error', 'Unauthorized');
-}
+require_once '../includes/admin_permissions.php';
+// Access-Control: reports are read-only analytics -> reports.view. Enforces
+// the full authenticated -> admin mode -> active -> permission chain.
+require_admin_permission($pdo, 'reports.view');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response('error', 'Invalid request method');

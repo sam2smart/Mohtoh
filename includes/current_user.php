@@ -34,6 +34,11 @@ $currentUser = [
     // user_type 'rider' and has_driver_capability true, which is what lets
     // the sidebar offer "Switch to Driver" instead of "Become a Driver".
     'has_driver_capability' => false,
+    // Admin CAPABILITY (additive to user_type, like is_keke_driver): whether
+    // this account can wear the admin hat, and whether that hat is active.
+    // Drives the sidebar's "Switch to Admin" entry for multi-role accounts.
+    'is_admin' => false,
+    'admin_status' => 'active',
 ];
 
 if (isset($pdo, $_SESSION['user_id'])) {
@@ -65,5 +70,19 @@ if (isset($pdo, $_SESSION['user_id'])) {
         }
     } catch (Exception $e) {
         // Fall back to the defaults above; never block page render on this.
+    }
+
+    // Admin capability, isolated in its own try/catch so a DB where the admin
+    // RBAC columns don't exist yet (migrate_admin_rbac.php not run) can never
+    // break the profile lookup above — the account simply reads as non-admin.
+    try {
+        $adminStmt = $pdo->prepare('SELECT is_admin, admin_status FROM users WHERE id = ?');
+        $adminStmt->execute([$_SESSION['user_id']]);
+        if ($adminRow = $adminStmt->fetch()) {
+            $currentUser['is_admin'] = (bool)$adminRow['is_admin'];
+            $currentUser['admin_status'] = $adminRow['admin_status'] ?: 'active';
+        }
+    } catch (Exception $e) {
+        // No admin RBAC columns yet — treat as non-admin.
     }
 }

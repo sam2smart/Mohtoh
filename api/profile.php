@@ -14,6 +14,7 @@ session_start();
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 require_once '../includes/verification.php'; // password_meets_policy(), log_verification_event()
+require_once '../includes/image_optimizer.php'; // mt_optimize_uploaded_image()
 
 header('Content-Type: application/json');
 
@@ -196,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$existingUser || !password_verify($current_password, $existingUser['password'])) {
             json_response('error', 'Current password is incorrect.');
         }
-        $update_fields[] = "password = ?";
+        $update_fields[] = "password = ?, password_is_set = 1";
         $params[] = password_hash($new_password, PASSWORD_DEFAULT);
         // Authentication & Recovery module: a manual password change
         // invalidates any outstanding forgot-password token/OTP so an
@@ -216,6 +217,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $filename = 'profile_' . $user_id . '_' . uniqid() . '.' . $ext;
         if (move_uploaded_file($_FILES['profile_image']['tmp_name'], $upload_dir . $filename)) {
+            // Compress/resize the avatar in place (safe no-op without GD).
+            mt_optimize_uploaded_image($upload_dir . $filename);
             $update_fields[] = "profile_image = ?";
             $params[] = $filename;
         } else {

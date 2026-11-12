@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function driverBlock(b) {
-    const img = b.driver_image && b.driver_image !== 'default.png' ? `../uploads/${b.driver_image}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(b.driver_name)}&background=0F8B8D&color=fff`;
+    const img = b.driver_image && b.driver_image !== 'default.png' ? `../img.php?f=${encodeURIComponent(b.driver_image)}&w=160` : `https://ui-avatars.com/api/?name=${encodeURIComponent(b.driver_name)}&background=0F8B8D&color=fff`;
     return `
       <div class="ride-tile__driver">
         <img src="${img}" alt="">

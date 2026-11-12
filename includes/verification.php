@@ -415,7 +415,7 @@ function reset_password($pdo, $identifier, $proof, $newPassword) {
         return $check;
     }
 
-    $pdo->prepare("UPDATE users SET password = ?, reset_token = NULL, reset_expires = NULL, reset_used = 1, failed_login_attempts = 0, lockout_until = NULL WHERE id = ?")
+    $pdo->prepare("UPDATE users SET password = ?, password_is_set = 1, reset_token = NULL, reset_expires = NULL, reset_used = 1, failed_login_attempts = 0, lockout_until = NULL WHERE id = ?")
         ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $check['user_id']]);
     log_verification_event($pdo, $check['user_id'], 'password_reset', 'verified');
     return ['success' => true, 'message' => 'Your password has been reset. You can now log in.'];

@@ -631,6 +631,13 @@
 .payment-status-actions { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
 .payment-status-actions .btn-sm { flex: 1; }
 
+/* ---- Driver -> passenger rating (Passengers sheet) ---- */
+.passenger-rate { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
+.passenger-rate__stars { display: inline-flex; align-items: center; gap: 2px; font-size: var(--text-md); color: var(--color-accent, #f5a623); }
+.passenger-rate__star { background: none; border: none; padding: 0 1px; cursor: pointer; font-size: var(--text-lg); line-height: 1; color: var(--color-accent, #f5a623); }
+.passenger-rate__star:hover { transform: scale(1.1); }
+.passenger-rate__stars.is-readonly { color: var(--color-accent, #f5a623); }
+
 /* ---- Profile screen (rider/profile.php, driver/profile.php) ---- */
 .avatar { border-radius: 50%; object-fit: cover; background: var(--color-primary-100); flex: 0 0 auto; }
 .avatar-lg { width: 76px; height: 76px; }
