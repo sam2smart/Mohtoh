@@ -28,6 +28,7 @@ if ($action === 'list') {
 }
 
 if ($action === 'add') {
+    require_csrf($input);
     $label = sanitize_input($input['label'] ?? '');
     $address = sanitize_input($input['address'] ?? '');
     $latitude = $input['latitude'] ?? null;
@@ -54,6 +55,7 @@ if ($action === 'add') {
 }
 
 if ($action === 'delete') {
+    require_csrf($input);
     $publicId = $input['public_id'] ?? '';
     if ($publicId === '') {
         json_response('error', 'Missing location id.');

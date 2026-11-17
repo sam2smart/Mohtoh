@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$input) {
         $input = $_POST;
     }
+    require_csrf($input);
 
     $receiver_id = (int)($input['receiver_id'] ?? 0);
     $message = sanitize_input($input['message'] ?? '');

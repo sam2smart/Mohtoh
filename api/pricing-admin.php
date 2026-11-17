@@ -87,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($input)) {
         $input = $_POST;
     }
+    require_csrf($input);
 
     $adminId = $_SESSION['user_id'];
     $changed = [];

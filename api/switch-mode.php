@@ -145,6 +145,7 @@ if ($action === 'get_modes' || $action === '') {
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response('error', 'Invalid request method');
 }
+require_csrf($input);
 
 switch ($action) {
 

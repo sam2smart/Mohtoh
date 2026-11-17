@@ -17,6 +17,19 @@
 
 const API_DEFAULT_TIMEOUT_MS = 15000;
 
+// Every state-changing api/*.php endpoint that has adopted require_csrf()
+// (includes/functions.php) reads the token from the X-CSRF-Token header
+// first — sending it here, once, for every POST/upload this shared layer
+// makes means any endpoint can opt in to require_csrf() server-side
+// without every individual caller in this file having to remember to add
+// it. Harmless to send on an endpoint that doesn't check it yet. Reads
+// the same <meta name="csrf-token"> tag every page that needs it already
+// renders via includes/functions.php's csrf_token().
+function _mtCsrfToken() {
+  if (typeof document === 'undefined') return '';
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
 // This app's api/*.php endpoints never send a real HTTP 401 — every
 // is_logged_in() check responds 200 OK with {status:'error',
 // message:'Unauthorized'} (see api/notifications.php, api/profile.php,
@@ -40,6 +53,12 @@ async function _mtApiRequest(url, options = {}) {
       } else {
         fetchOptions.headers = { 'Content-Type': 'application/json' };
         fetchOptions.body = JSON.stringify(body);
+      }
+    }
+    if (method === 'POST') {
+      const csrfToken = _mtCsrfToken();
+      if (csrfToken) {
+        fetchOptions.headers = { ...(fetchOptions.headers || {}), 'X-CSRF-Token': csrfToken };
       }
     }
     response = await fetch(url, fetchOptions);

@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
+require_csrf($input);
 
 $latitude = isset($input['latitude']) ? (float)$input['latitude'] : null;
 $longitude = isset($input['longitude']) ? (float)$input['longitude'] : null;

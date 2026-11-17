@@ -99,6 +99,7 @@ try {
     }
 
     if ($action === 'create' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $required = ['pickup_location','destination','departure_date','departure_time'];
         foreach ($required as $field) {
             if (!isset($input[$field]) || trim((string)$input[$field]) === '') {
@@ -358,6 +359,7 @@ try {
     }
 
     if ($action === 'update' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $ride_id = (int)($input['ride_id'] ?? 0);
         if ($ride_id <= 0) {
             json_response('error', 'Ride ID is required');
@@ -473,6 +475,7 @@ try {
     }
 
     if ($action === 'cancel' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $ride_id = (int)($input['ride_id'] ?? 0);
         if ($ride_id <= 0) {
             json_response('error', 'Ride ID is required');
@@ -711,6 +714,7 @@ try {
     }
 
     if ($action === 'start_ride' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $ride_id = (int)($input['ride_id'] ?? 0);
         if ($ride_id <= 0) {
             json_response('error', 'Ride ID is required');
@@ -724,6 +728,7 @@ try {
     }
 
     if ($action === 'complete_ride' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $ride_id = (int)($input['ride_id'] ?? 0);
         if ($ride_id <= 0) {
             json_response('error', 'Ride ID is required');
@@ -797,6 +802,7 @@ try {
     // instead of crediting the driver, it debits just the commission
     // the driver still owes on that fare.
     if ($action === 'confirm_direct_payment' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $booking_id = (int)($input['booking_id'] ?? 0);
         if ($booking_id <= 0) {
             json_response('error', 'Booking ID is required');
@@ -854,6 +860,7 @@ try {
     // this only closes out the pending record so it stops showing as
     // awaiting confirmation.
     if ($action === 'reject_direct_payment' && $_SESSION['user_type'] === 'driver') {
+        require_csrf($input);
         $booking_id = (int)($input['booking_id'] ?? 0);
         if ($booking_id <= 0) {
             json_response('error', 'Booking ID is required');
@@ -1104,6 +1111,7 @@ try {
     }
 
     if ($action === 'cancel_booking' && $_SESSION['user_type'] === 'rider') {
+        require_csrf($input);
         $booking_id = (int)($input['booking_id'] ?? 0);
         if ($booking_id <= 0) {
             json_response('error', 'Booking ID is required');
@@ -1174,6 +1182,7 @@ try {
     // logic, not a second copy of it. Behavior here is unchanged: same
     // checks, same order, same response shape.
     if ($action === 'book' && $_SESSION['user_type'] === 'rider') {
+        require_csrf($input);
         require_once '../includes/booking.php';
         $result = create_ride_booking(
             $pdo,
@@ -1187,6 +1196,7 @@ try {
     }
 
     if ($action === 'rate_ride' && $_SESSION['user_type'] === 'rider') {
+        require_csrf($input);
         $booking_id = (int)($input['booking_id'] ?? 0);
         $rating = (int)($input['rating'] ?? 0);
         $comment = sanitize_input($input['comment'] ?? '');

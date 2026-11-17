@@ -32,6 +32,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {
     $input = $_POST;
 }
+require_csrf($input);
 
 $is_online = isset($input['is_online']) ? (int)$input['is_online'] : null;
 if ($is_online === null || !in_array($is_online, [0, 1], true)) {

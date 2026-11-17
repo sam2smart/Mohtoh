@@ -96,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf($input);
     $action = $input['action'] ?? '';
 
     if ($action === 'create') {

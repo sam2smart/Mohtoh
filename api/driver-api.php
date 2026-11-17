@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$input) {
         $input = $_POST;
     }
+    require_csrf($input);
     
     $post_action = $input['action'] ?? $action;
 

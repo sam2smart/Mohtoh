@@ -74,6 +74,7 @@ if ($action === 'get_history') {
 // confirms the charge. The frontend never creates its own reference
 // and can never trigger a credit directly.
 if ($action === 'initialize_topup') {
+    require_csrf($input);
     $amount = (float)($input['amount'] ?? 0);
 
     if ($amount < 100) {
@@ -139,6 +140,7 @@ if ($action === 'topup_status') {
 }
 
 if ($action === 'set_payment_preference' && $_SESSION['user_type'] === 'driver') {
+    require_csrf($input);
     $preference = $input['payment_preference'] ?? '';
     if (!in_array($preference, ['wallet', 'direct', 'both'], true)) {
         json_response('error', 'Payment preference must be wallet, direct, or both.');

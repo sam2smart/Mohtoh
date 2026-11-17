@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
+require_csrf($input);
 
 $request_id = $input['request_id'] ?? null;
 $status = $input['status'] ?? null;

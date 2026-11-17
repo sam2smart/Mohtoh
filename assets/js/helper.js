@@ -16,7 +16,14 @@ function escapeHtml(value) {
 
 /** POST a JSON body to one of this app's api/*.php endpoints, return the parsed response. */
 async function postJson(url, payload) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  // Mirrors assets/js/api-client.js's _mtApiRequest(): send the page's
+  // CSRF token as a header on every POST, harmless on an endpoint that
+  // doesn't check it yet, required on any that has adopted require_csrf()
+  // (includes/functions.php).
+  const csrfToken = (typeof document !== 'undefined' && document.querySelector('meta[name="csrf-token"]')?.content) || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(payload) });
   return res.json();
 }
 

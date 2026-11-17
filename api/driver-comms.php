@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($input)) {
         $input = $_POST;
     }
+    require_csrf($input);
     $action = $input['action'] ?? '';
 
     if ($action === 'send_targeted') {

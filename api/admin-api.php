@@ -229,6 +229,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input = $_POST;
     }
 
+    // Every state-changing admin action below (user/driver/vehicle/ride
+    // moderation, pricing/settings writes, announcements, location and
+    // chat-report decisions) requires a valid per-session CSRF token —
+    // checked once here, same convention as api/network.php and
+    // api/network-admin.php, so nothing added below can accidentally skip
+    // it. See includes/functions.php's require_csrf().
+    require_csrf($input);
+
     $post_action = $input['action'] ?? '';
 
     if ($post_action === 'update_settings') {

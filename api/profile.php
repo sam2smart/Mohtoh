@@ -117,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$isJson) {
         $input = $_POST;
     }
+    require_csrf($input);
 
     $update_fields = [];
     $params = [];

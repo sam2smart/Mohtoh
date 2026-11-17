@@ -43,6 +43,8 @@ $pickupRadiusKm = (float) get_system_setting($pdo, 'private_pickup_radius_km', 2
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- App CSRF token for authenticated state-changing fetches. Not a secret; scoped to this session. -->
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>">
     <title>MohToh Driver — Pickup Ride</title>
 
     <link rel="manifest" href="../manifest.json">

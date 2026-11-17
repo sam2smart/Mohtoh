@@ -35,6 +35,13 @@ $action    = $input['action'] ?? $_GET['action'] ?? '';
 $user_id   = (int) $_SESSION['user_id'];
 $user_type = $_SESSION['user_type'] ?? '';
 
+// Every action here mutates state except the three read-only queries
+// (estimate, status, feed) — checked once here rather than at each write
+// case below, so nothing new added later can accidentally skip it.
+if (!in_array($action, ['estimate', 'status', 'feed'], true)) {
+    require_csrf($input);
+}
+
 try {
     switch ($action) {
 

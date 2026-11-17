@@ -23,6 +23,12 @@ if (!is_array($input)) {
     $input = $_POST;
 }
 $action = $input['action'] ?? $_GET['action'] ?? '';
+// Every action here mutates state except the one read-only query
+// (get_live_status) — checked once here rather than at each of the 9
+// write branches below, so nothing new added later can accidentally skip it.
+if ($action !== 'get_live_status') {
+    require_csrf($input);
+}
 $userType = $_SESSION['user_type'];
 $userId = (int) $_SESSION['user_id'];
 

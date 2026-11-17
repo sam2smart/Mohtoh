@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
+require_csrf($input);
 
 $request_id = (int)($input['request_id'] ?? 0);
 $driver_id = (int)($input['driver_id'] ?? 0);
