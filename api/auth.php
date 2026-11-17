@@ -48,6 +48,17 @@ if ($action === 'register') {
         $user_type = 'driver';
         $driver_class = 'keke';
     }
+    // MOHTOH NETWORK External Partner (Phase 5) — same shorthand pattern as
+    // 'keke' above: the form offers a 4th choice but this app has only two
+    // auth roles. An external partner (someone who refers drivers/
+    // passengers but never drives or rides) is stored as an ordinary
+    // user_type='rider' account with is_external_partner=1 set after
+    // insert below. See MOHTOH_EXTERNAL_PARTNER_PROPOSAL.md.
+    $is_external_partner = false;
+    if ($user_type === 'external_partner') {
+        $user_type = 'rider';
+        $is_external_partner = true;
+    }
     // MohToh Community Rewards — optional, never blocks registration if
     // absent, invalid, or self-referential (resolved silently below).
     $referral_code = trim(sanitize_input($_POST['referral_code'] ?? ''));
@@ -148,6 +159,18 @@ if ($action === 'register') {
             $pdo->prepare("UPDATE users SET is_keke_driver = 1, private_pickup_enabled = 1 WHERE id = ?")->execute([$user_id]);
         }
 
+        // External Partner: flag the account, then join MOHTOH NETWORK
+        // immediately — being a partner is this account's entire purpose,
+        // unlike a rider/driver who opts in later from their own dashboard.
+        // Never blocks registration if network_join() refuses (e.g.
+        // registrations currently closed) — the account still exists and
+        // can join later from partner/dashboard.php once it's open again.
+        if ($is_external_partner) {
+            $pdo->prepare("UPDATE users SET is_external_partner = 1 WHERE id = ?")->execute([$user_id]);
+            require_once __DIR__ . '/../includes/network.php';
+            network_join($pdo, $user_id);
+        }
+
         // Account starts EMAIL_NOT_VERIFIED / PHONE_NOT_VERIFIED (column
         // defaults) — kick off a verification send for each channel that
         // is currently ENABLED so the Verify Account screen has something
@@ -185,7 +208,7 @@ if ($action === 'register') {
         json_response('success', 'Registration successful', [
             'redirect' => ($emailVerificationEnabled || $phoneVerificationEnabled)
                 ? 'verify-account.php'
-                : $user_type . '/dashboard.php'
+                : ($is_external_partner ? 'partner/dashboard.php' : $user_type . '/dashboard.php')
         ]);
     } else {
         json_response('error', 'Registration failed');
@@ -245,7 +268,9 @@ if ($action === 'register') {
         || ($requirePhoneToLogin && is_phone_verification_enabled($pdo) && !$user['phone_verified']);
 
     json_response('success', 'Login successful', [
-        'redirect' => $needsVerification ? 'verify-account.php' : $user['user_type'] . '/dashboard.php'
+        'redirect' => $needsVerification
+            ? 'verify-account.php'
+            : (!empty($user['is_external_partner']) ? 'partner/dashboard.php' : $user['user_type'] . '/dashboard.php')
     ]);
 } elseif ($action === 'logout') {
     session_destroy();

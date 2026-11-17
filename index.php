@@ -197,6 +197,7 @@ if (isset($_SESSION['user_id'])) {
                         <option value="rider">Become a Rider</option>
                         <option value="driver">Become a Driver</option>
                         <option value="keke">Become a Keke Driver</option>
+                        <option value="external_partner">Become a MOHTOH NETWORK Partner</option>
                     </select>
                 </div>
                 <p class="u-text-xs u-text-faint u-mt-1" id="registerUserTypeHint">Find and join rides published by drivers.</p>

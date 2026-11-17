@@ -86,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     rider: 'Find and join rides published by drivers.',
     driver: 'Publish rides and fill seats on Join Ride trips.',
     keke: 'Join Ride trips plus Private Solo Pickup, once your keke is verified.',
+    external_partner: 'Refer drivers and passengers and earn rewards — no driving or riding required.',
   };
 
   function syncUserTypeHint() {

@@ -123,13 +123,38 @@ function network_join($pdo, $userId, $termsVersion = null) {
     if (!network_registrations_enabled($pdo)) {
         return ['error' => 'MOHTOH NETWORK registrations are currently closed.'];
     }
-    $stmt = $pdo->prepare("SELECT id, fullname, user_type FROM users WHERE id = ?");
+    // Phase 7 fix: network_launch_at/network_closes_at were admin-facing
+    // settings (shown and editable in the Network Settings tab) that this
+    // function never actually checked — setting a future launch date or a
+    // past closing date had no effect, a misleading control. Blank means
+    // "no boundary" on that side, matching every other optional date field
+    // in this app's admin settings.
+    $launchAt = network_setting($pdo, 'network_launch_at', '');
+    if ($launchAt !== '' && strtotime($launchAt) > time()) {
+        return ['error' => 'MOHTOH NETWORK has not launched yet.'];
+    }
+    $closesAt = network_setting($pdo, 'network_closes_at', '');
+    if ($closesAt !== '' && strtotime($closesAt) < time()) {
+        return ['error' => 'MOHTOH NETWORK registrations are closed for this programme window.'];
+    }
+    $stmt = $pdo->prepare("SELECT id, fullname, user_type, is_external_partner FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $user = $stmt->fetch();
     if (!$user) {
         return ['error' => 'Account not found.'];
     }
-    $category = $user['user_type'] === 'driver' ? 'driver' : 'passenger';
+    // External Partner (Phase 5) is its own category, checked against
+    // network_external_partners_enabled — previously this setting was
+    // defined but never actually reachable, because every account was
+    // classified as 'driver' or 'passenger' with no third option. An
+    // external partner is a `users` row with user_type='rider' and
+    // is_external_partner=1 (see MOHTOH_EXTERNAL_PARTNER_PROPOSAL.md);
+    // never classified as 'passenger' just because the ENUM is 'rider'.
+    if (!empty($user['is_external_partner'])) {
+        $category = 'external';
+    } else {
+        $category = $user['user_type'] === 'driver' ? 'driver' : 'passenger';
+    }
     if (!network_category_enabled($pdo, $category)) {
         return ['error' => 'MOHTOH NETWORK is not currently open to your account type.'];
     }
@@ -876,6 +901,22 @@ function network_admin_decide_withdrawal($pdo, $adminId, $withdrawalId, $decisio
         return ['error' => "Cannot {$decision} a withdrawal that is currently '{$withdrawal['status']}'."];
     }
 
+    // Phase 5 (MOHTOH_EXTERNAL_PARTNER_PROPOSAL.md item 7): a withdrawal
+    // account's verified_at existed in the schema but was never set or
+    // checked anywhere — approving a payout to an unverified account
+    // worked exactly the same as to a verified one. Require it on
+    // approval only (not reject/processing/paid/failed, which never move
+    // money to a new destination), so an admin can verify once and every
+    // future withdrawal from that same account approves normally.
+    if ($decision === 'approve') {
+        $acctStmt = $pdo->prepare("SELECT verified_at FROM network_withdrawal_accounts WHERE id = ?");
+        $acctStmt->execute([$withdrawal['withdrawal_account_id']]);
+        $verifiedAt = $acctStmt->fetchColumn();
+        if ($verifiedAt === false || $verifiedAt === null) {
+            return ['error' => 'This withdrawal account has not been verified yet. Verify it before approving a payout.'];
+        }
+    }
+
     $newStatus = $map[$decision];
     $restoresFunds = in_array($decision, ['reject', 'failed'], true);
 
@@ -908,6 +949,29 @@ function network_admin_decide_withdrawal($pdo, $adminId, $withdrawalId, $decisio
     ]);
 
     return ['status' => $newStatus];
+}
+
+// Phase 5 (MOHTOH_EXTERNAL_PARTNER_PROPOSAL.md item 7): the one admin
+// action that sets verified_at, which network_admin_decide_withdrawal()
+// now requires before a withdrawal can be approved. Idempotent — marking
+// an already-verified account verified again just updates the timestamp
+// and is harmless; there's no un-verify action because downgrading trust
+// on a bank account that's already received money isn't a real decision
+// this admin console needs to make.
+function network_admin_verify_withdrawal_account($pdo, $adminId, $accountId) {
+    $stmt = $pdo->prepare("SELECT id, user_id, bank_name, account_number_last4, verified_at FROM network_withdrawal_accounts WHERE id = ?");
+    $stmt->execute([$accountId]);
+    $account = $stmt->fetch();
+    if (!$account) {
+        return ['error' => 'Withdrawal account not found.'];
+    }
+
+    $pdo->prepare("UPDATE network_withdrawal_accounts SET verified_at = NOW() WHERE id = ?")->execute([$accountId]);
+
+    log_admin_action($pdo, $adminId, 'network_withdrawal_account_verified', 'network_withdrawal_accounts', $accountId,
+        $account['verified_at'] ? 'verified' : 'unverified', 'verified', null);
+
+    return ['status' => 'verified', 'account_id' => $accountId];
 }
 
 // ---------------------------------------------------------------

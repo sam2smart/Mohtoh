@@ -21,7 +21,7 @@ if (!is_logged_in()) {
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/verification.php';
 
-$stmt = $pdo->prepare('SELECT email, phone, email_verified, phone_verified, user_type FROM users WHERE id = ?');
+$stmt = $pdo->prepare('SELECT email, phone, email_verified, phone_verified, user_type, is_external_partner FROM users WHERE id = ?');
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
 if (!$user) {
@@ -42,7 +42,7 @@ $phoneComplete = $user['phone_verified'] || !$phoneChannelEnabled;
 // disabled) — send the user on. No DB write; email_verified /
 // phone_verified stay exactly as they were.
 if ($emailComplete && $phoneComplete) {
-    header('Location: ' . $user['user_type'] . '/dashboard.php');
+    header('Location: ' . (!empty($user['is_external_partner']) ? 'partner/dashboard.php' : $user['user_type'] . '/dashboard.php'));
     exit;
 }
 ?>

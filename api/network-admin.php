@@ -33,7 +33,7 @@ const NETWORK_SETTING_KEYS = [
     'network_external_partners_enabled', 'network_maintenance_mode', 'network_emergency_payout_suspended',
     'network_launch_at', 'network_closes_at', 'network_terms_version', 'network_terms_text', 'network_announcement',
     'network_partner_auto_approve', 'network_driver_reward_pct', 'network_passenger_reward_pct',
-    'network_combined_ceiling_pct', 'network_earning_days', 'network_min_withdrawal', 'network_registration_bonus',
+    'network_combined_ceiling_pct', 'network_earning_days', 'network_min_withdrawal',
     'network_reward_hold_days', 'network_total_budget', 'network_daily_budget', 'network_monthly_budget',
     'network_max_combined_payout_per_txn', 'network_max_withdrawal_per_day', 'network_max_withdrawal_per_month',
     'network_fraud_velocity_max_per_day', 'network_fraud_same_pair_max_rewards',
@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             SELECT w.id, w.public_id, w.amount, w.status, w.requested_at, w.reviewed_at, w.payment_reference,
                    w.rejection_reason, w.processed_at,
                    u.fullname AS user_name, u.user_id AS public_user_id,
-                   a.bank_name, a.account_number_last4, a.account_name
+                   a.id AS withdrawal_account_id, a.bank_name, a.account_number_last4, a.account_name, a.verified_at AS account_verified_at
             FROM network_withdrawals w
             JOIN users u ON u.id = w.user_id
             JOIN network_withdrawal_accounts a ON a.id = w.withdrawal_account_id
@@ -372,7 +372,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Manager vs. Finance Admin) — never a blanket check shared across
     // both groups, or one role would wrongly gate out the other.
     $partnerActions = ['approve_partner', 'suspend_partner', 'reactivate_partner', 'correct_attribution'];
-    $financeActions = ['adjust_reward', 'reverse_reward', 'decide_withdrawal', 'resolve_fraud_flag'];
+    $financeActions = ['adjust_reward', 'reverse_reward', 'decide_withdrawal', 'resolve_fraud_flag', 'verify_withdrawal_account'];
     if (in_array($action, $partnerActions, true)) {
         require_admin_permission($pdo, 'network.partners.manage');
     } elseif (in_array($action, $financeActions, true)) {
@@ -430,6 +430,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'resolve_fraud_flag') {
         $result = network_resolve_fraud_flag($pdo, $adminId, (int)($input['flag_id'] ?? 0), $input['status'] ?? '', trim((string)($input['notes'] ?? '')));
         json_response(isset($result['error']) ? 'error' : 'success', $result['error'] ?? 'Fraud flag updated.', $result);
+    }
+    if ($action === 'verify_withdrawal_account') {
+        $result = network_admin_verify_withdrawal_account($pdo, $adminId, (int)($input['account_id'] ?? 0));
+        json_response(isset($result['error']) ? 'error' : 'success', $result['error'] ?? 'Withdrawal account verified.', $result);
     }
 
     json_response('error', 'Invalid action');

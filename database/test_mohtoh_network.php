@@ -222,6 +222,7 @@ try {
 
     $pdo->exec("UPDATE system_settings SET setting_value = '1' WHERE setting_key = 'network_min_withdrawal'");
     $accountId = network_add_withdrawal_account($pdo, $referrer2, 'Test Bank', '0123456789', 'Test Account');
+    $pdo->prepare("UPDATE network_withdrawal_accounts SET verified_at = NOW() WHERE id = ?")->execute([$accountId]); // Phase 5: approval now requires a verified account
     $req = network_request_withdrawal($pdo, $referrer2, $accountId, $available);
     check('withdrawal request accepted and debits available_balance', isset($req['withdrawal_id']));
     $stmt->execute([$referrer2]);

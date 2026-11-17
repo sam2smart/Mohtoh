@@ -1256,7 +1256,6 @@ if ($_SESSION['user_type'] !== 'admin') {
                             <div class="col-md-3"><label class="form-label">Combined reward ceiling (%)</label><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" id="net-combined-ceiling-pct"></div>
                             <div class="col-md-3"><label class="form-label">Earning duration (days)</label><input type="number" min="1" class="form-control form-control-sm" id="net-earning-days"></div>
                             <div class="col-md-3"><label class="form-label">Minimum withdrawal (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-min-withdrawal"></div>
-                            <div class="col-md-3"><label class="form-label">Registration bonus (₦)</label><input type="number" min="0" step="0.01" class="form-control form-control-sm" id="net-registration-bonus"></div>
                             <div class="col-md-3"><label class="form-label">Reward holding period (days)</label><input type="number" min="0" class="form-control form-control-sm" id="net-reward-hold-days"></div>
 
                             <div class="col-12"><hr></div>
@@ -1645,9 +1644,9 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
     async function completeRide(rideId){ const res=await sendAction({action:'complete_ride_share',ride_id:rideId}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to complete ride'); }
     async function removeRide(rideId){ const res=await sendAction({action:'remove_ride_share',ride_id:rideId}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to remove ride'); }
     async function cancelBooking(bookingId){ const res=await sendAction({action:'cancel_booking',booking_id:bookingId}); if(res.status==='success') loadDashboardData(); else alert(res.message||'Unable to cancel booking'); }
-    async function sendAction(payload){ const res=await fetch('../api/admin-api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
+    async function sendAction(payload){ const res=await fetch('../api/admin-api.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken()},body:JSON.stringify(payload)}); return res.json(); }
     // ---- Shared helper: POST JSON to any endpoint (sendAction above is admin-api.php-specific) ----
-    async function postJson(url, payload){ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); return res.json(); }
+    async function postJson(url, payload){ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken()},body:JSON.stringify(payload)}); return res.json(); }
     // ---- CSRF-protected POST, for api/network-admin.php only ----
     // Same contract as postJson(), but every call carries the session's
     // CSRF token (read from the <meta name="csrf-token"> tag this page
@@ -2451,7 +2450,7 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
         'net-partner-auto-approve': 'network_partner_auto_approve', 'net-launch-at': 'network_launch_at', 'net-closes-at': 'network_closes_at',
         'net-driver-reward-pct': 'network_driver_reward_pct', 'net-passenger-reward-pct': 'network_passenger_reward_pct',
         'net-combined-ceiling-pct': 'network_combined_ceiling_pct', 'net-earning-days': 'network_earning_days',
-        'net-min-withdrawal': 'network_min_withdrawal', 'net-registration-bonus': 'network_registration_bonus',
+        'net-min-withdrawal': 'network_min_withdrawal',
         'net-reward-hold-days': 'network_reward_hold_days', 'net-total-budget': 'network_total_budget',
         'net-daily-budget': 'network_daily_budget', 'net-monthly-budget': 'network_monthly_budget',
         'net-max-combined-payout-per-txn': 'network_max_combined_payout_per_txn', 'net-max-withdrawal-per-day': 'network_max_withdrawal_per_day',
@@ -2615,6 +2614,14 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
     const NET_WITHDRAWAL_BADGE = { pending: 'bg-warning text-dark', under_review: 'bg-info', approved: 'bg-info', processing: 'bg-info', paid: 'bg-success', rejected: 'bg-danger', failed: 'bg-danger', reversed: 'bg-secondary' };
     function netWithdrawalActionButtons(w) {
         if (['pending', 'under_review'].includes(w.status)) {
+            // Phase 5: an unverified account's withdrawal can only be
+            // Rejected or have its account Verified first — Approve
+            // itself is server-enforced (network_admin_decide_withdrawal)
+            // to refuse an unverified account, so this button is the
+            // actual path to make Approve possible, not just a UI nicety.
+            if (!w.account_verified_at) {
+                return `<button class="btn btn-sm btn-outline-warning me-1 mb-1" onclick="verifyNetworkWithdrawalAccount(${w.withdrawal_account_id})">Verify Account</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'reject')">Reject</button>`;
+            }
             return `<button class="btn btn-sm btn-outline-success me-1 mb-1" onclick="decideNetworkWithdrawal(${w.id},'approve')">Approve</button><button class="btn btn-sm btn-outline-danger mb-1" onclick="decideNetworkWithdrawal(${w.id},'reject')">Reject</button>`;
         }
         if (['approved', 'processing'].includes(w.status)) {
@@ -2636,13 +2643,18 @@ bodyEl.innerHTML=`<div class="row g-3"><div class="col-12"><div class="border ro
         body.innerHTML = rows.length ? rows.map(w => `<tr>
             <td>${escapeHtml(w.user_name)} <span class="text-muted small">${escapeHtml(w.public_user_id || '')}</span></td>
             <td>₦${Number(w.amount).toLocaleString()}</td>
-            <td class="small">${escapeHtml(w.bank_name)} ••${escapeHtml(w.account_number_last4)}<br>${escapeHtml(w.account_name)}</td>
+            <td class="small">${escapeHtml(w.bank_name)} ••${escapeHtml(w.account_number_last4)}<br>${escapeHtml(w.account_name)} ${w.account_verified_at ? '<span class="badge bg-success">Verified</span>' : '<span class="badge bg-warning text-dark">Unverified</span>'}</td>
             <td><span class="badge ${NET_WITHDRAWAL_BADGE[w.status] || 'bg-secondary'}">${escapeHtml(w.status.replace('_', ' '))}</span></td>
             <td class="small text-muted">${w.requested_at ? new Date(w.requested_at).toLocaleString() : ''}</td>
             <td class="small">${escapeHtml(w.payment_reference || w.rejection_reason || '—')}</td>
             <td>${canManage ? netWithdrawalActionButtons(w) : ''}</td>
         </tr>`).join('') : '<tr><td colspan="7" class="text-muted text-center py-3">No withdrawals match these filters.</td></tr>';
         renderPagination('net-withdrawals-pagination', data.pagination, loadNetworkWithdrawals);
+    }
+    async function verifyNetworkWithdrawalAccount(accountId) {
+        if (!confirm('Confirm this bank account has been checked (name/number match the partner) and mark it verified? This is required before any withdrawal from it can be approved.')) return;
+        const res = await postJsonCsrf('../api/network-admin.php?action=verify_withdrawal_account', { account_id: accountId });
+        if (res.status === 'success') loadNetworkWithdrawals(1); else alert(res.message || 'Failed');
     }
     async function decideNetworkWithdrawal(id, decision) {
         let note = null;
