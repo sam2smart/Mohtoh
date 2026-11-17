@@ -25,6 +25,19 @@ function mt_secret_key(): string {
     }
     if ($key === '') {
         // Deterministic fallback: sha256(app-name + app-encryption-salt).
+        // SECURITY: this salt and app name are both in this file, which is
+        // source-controlled — anyone who can read this repository can
+        // derive this exact fallback key. It exists only so a fresh
+        // install never hard-fails; it is NOT a substitute for a real
+        // APP_ENCRYPTION_KEY wherever actual secrets (SMTP/API credentials,
+        // MOHTOH NETWORK withdrawal bank account numbers) are stored. Log
+        // once per process so this misconfiguration shows up in
+        // error_log.txt instead of silently persisting forever.
+        static $warned = false;
+        if (!$warned) {
+            $warned = true;
+            error_log('SECURITY WARNING: APP_ENCRYPTION_KEY is unset or invalid — falling back to a key derivable from public source code (includes/secrets.php). Set a real 32-byte hex APP_ENCRYPTION_KEY in .env on any environment that stores real credentials.');
+        }
         $salt = 'mohtoh-merit-enc-v1';
         $appName = defined('APP_NAME') ? APP_NAME : 'mohtoh';
         $key = hash('sha256', $appName . '|' . $salt, true); // always 32 bytes

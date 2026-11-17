@@ -1,0 +1,31 @@
+# Local Claude Code tooling (machine-specific absolute paths, personal permission allowlist)
+.claude/settings.local.json
+.claude/launch.json
+
+# Environment files — real credentials/config live here; .env.example is
+# the tracked template. These are being removed from tracking in this
+# same change (git rm --cached), but stay ignored going forward so a
+# local edit is never re-added by accident.
+.env
+.env.bak
+.env.local
+.env.*.local
+
+# Logs (may contain SMTP account details, live-looking reset/verification tokens, etc.)
+error_log.txt
+storage/*.log
+
+# Ad-hoc local debug/inspection scripts — never deploy (no auth, dump DB contents)
+/_e2e_*.php
+/_sim_*.php
+/db_check.php
+/test_runner.php
+
+# User-uploaded documents/photos and generated thumbnail cache — not source-controlled
+/uploads/*
+!/uploads/.gitkeep
+/uploads/cache/
+
+# Backup files left behind by refactors
+*.bak
+*.bak-*
